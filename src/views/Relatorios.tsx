@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, Download, Calendar, Filter, TrendingUp, Users, Building2, Network, Award, Loader2, FileSpreadsheet } from 'lucide-react';
+import { FileText, Calendar, Filter, TrendingUp, Users, Building2, Network, Award, Loader2, FileSpreadsheet } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useNotification } from '../context/NotificationContext';
 import { Card } from '../components/ui/Card';
@@ -8,7 +8,7 @@ import * as XLSX from 'xlsx';
 
 type TipoRelatorio = 'vendedor' | 'filial' | 'setor' | 'ranking' | 'comparativo';
 
-export const Relatorios = ({ permissions }: { permissions: any }) => {
+export const Relatorios = ({ permissions: _permissions }: { permissions: any }) => {
   const { showToast } = useNotification();
   const [tipoRelatorio, setTipoRelatorio] = useState<TipoRelatorio>('vendedor');
   const [loading, setLoading] = useState(false);
@@ -330,7 +330,6 @@ export const Relatorios = ({ permissions }: { permissions: any }) => {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-cyan-400">Relatórios</h1>
-        <p className="text-gray-400 mt-1">Gere relatórios e exporte para Excel</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

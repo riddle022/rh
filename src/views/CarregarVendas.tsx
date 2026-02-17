@@ -4,13 +4,7 @@ import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
 import { Card } from '../components/ui/Card';
 
-interface VendaRow {
-  vendedor: string;
-  valor: number;
-  data_venda?: string;
-}
-
-export const CarregarVendas = ({ permissions }: { permissions: any }) => {
+export const CarregarVendas = ({ permissions: _permissions }: { permissions: any }) => {
   const [loading, setLoading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [result, setResult] = useState<{
@@ -143,7 +137,6 @@ export const CarregarVendas = ({ permissions }: { permissions: any }) => {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-cyan-400">Carregar Vendas</h1>
-        <p className="text-gray-400 mt-1">Importe vendas através de arquivos Excel</p>
       </div>
 
       <Card className="p-8">
@@ -152,14 +145,14 @@ export const CarregarVendas = ({ permissions }: { permissions: any }) => {
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           className={`border-2 border-dashed rounded-xl p-12 text-center transition-all ${dragging
-              ? 'border-cyan-400 bg-cyan-500/10'
-              : 'border-gray-700 hover:border-cyan-500/50 hover:bg-cyan-500/5'
+            ? 'border-cyan-400 bg-cyan-500/10'
+            : 'border-gray-700 hover:border-cyan-500/50 hover:bg-cyan-500/5'
             }`}
         >
           <div className="flex flex-col items-center gap-4">
             <div className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${dragging
-                ? 'bg-gradient-to-br from-cyan-400 to-cyan-600 scale-110'
-                : 'bg-gradient-to-br from-cyan-500/20 to-cyan-600/20'
+              ? 'bg-gradient-to-br from-cyan-400 to-cyan-600 scale-110'
+              : 'bg-gradient-to-br from-cyan-500/20 to-cyan-600/20'
               }`}>
               {loading ? (
                 <Loader2 className="w-10 h-10 text-cyan-400 animate-spin" />

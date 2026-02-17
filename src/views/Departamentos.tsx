@@ -108,7 +108,6 @@ export const Departamentos = ({ permissions }: { permissions: any }) => {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold text-cyan-400">Departamentos</h1>
-                    <p className="text-gray-400 mt-1">Gerencie os departamentos gerais (Administrativo, Comercial, etc.)</p>
                 </div>
                 {permissions?.editar && (
                     <button

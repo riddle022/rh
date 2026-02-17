@@ -29,7 +29,7 @@ export const Funcionarios = ({ onViewChange, permissions }: { onViewChange: (vie
         departamento_id: '',
         cargo_id: '',
         salario_base: 0,
-        data_admissao: new Date().toISOString().split('T')[0],
+        data_admissao: new Date().toLocaleDateString('en-CA'),
         data_desvinculamento: '',
         regime_contratacao: 'CLT' as 'CLT' | 'PJ' | 'Estágio',
         sexo: '',
@@ -231,7 +231,7 @@ export const Funcionarios = ({ onViewChange, permissions }: { onViewChange: (vie
             departamento_id: '',
             cargo_id: '',
             salario_base: 0,
-            data_admissao: new Date().toISOString().split('T')[0],
+            data_admissao: new Date().toLocaleDateString('en-CA'),
             data_desvinculamento: '',
             regime_contratacao: 'CLT' as 'CLT' | 'PJ' | 'Estágio',
             sexo: '',
@@ -269,7 +269,6 @@ export const Funcionarios = ({ onViewChange, permissions }: { onViewChange: (vie
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold text-cyan-400">Funcionários</h1>
-                    <p className="text-gray-400 mt-1">Gestão completa de pessoal e ficha técnica</p>
                 </div>
                 {permissions?.editar && (
                     <button
@@ -314,7 +313,7 @@ export const Funcionarios = ({ onViewChange, permissions }: { onViewChange: (vie
                         <div className="space-y-2 mb-6">
                             <div className="flex items-center gap-2 text-sm text-gray-400">
                                 <Calendar className="w-4 h-4" />
-                                <span>Admissão: {new Date(f.data_admissao).toLocaleDateString('pt-BR')}</span>
+                                <span>Admissão: {f.data_admissao.split('-').reverse().join('/')}</span>
                             </div>
                             <div className="flex items-center gap-2 text-sm text-gray-400">
                                 <DollarSign className="w-4 h-4" />

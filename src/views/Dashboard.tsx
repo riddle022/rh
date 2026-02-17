@@ -19,7 +19,7 @@ interface DashboardStats {
   aniversariantesMes: number;
 }
 
-export const Dashboard = ({ permissions }: { permissions: any }) => {
+export const Dashboard = ({ permissions: _permissions }: { permissions: any }) => {
   const [loading, setLoading] = useState(true);
   const [filiais, setFiliais] = useState<Filial[]>([]);
   const [setores, setSetores] = useState<Setor[]>([]);
@@ -51,7 +51,7 @@ export const Dashboard = ({ permissions }: { permissions: any }) => {
       ]);
 
       const scaleIds = (escalasRes.data || []).map(s => s.id);
-      
+
       let entries: EscalaEntrada[] = [];
       if (scaleIds.length > 0) {
         const { data } = await supabase
@@ -86,7 +86,7 @@ export const Dashboard = ({ permissions }: { permissions: any }) => {
     // Presencia real basada en la escala de hoy
     // Códigos que NO representan presencia: F (Folga), FD (Folga Domingo), FR (Férias), FE (Feriado), AT (Atestado), CF (Compensación)
     const ausencias = ['F', 'FD', 'FR', 'FE', 'AT', 'CF'];
-    
+
     const presentes = filteredFuncionarios.filter(f => {
       const entry = escalaEntries.find(e => e.funcionario_id === f.id);
       if (!entry || !entry.turno) return false;
@@ -137,7 +137,6 @@ export const Dashboard = ({ permissions }: { permissions: any }) => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-cyan-400">Dashboard RH</h1>
-          <p className="text-gray-400 mt-1">Visão geral e indicadores em tempo real</p>
         </div>
 
         <div className="flex items-center gap-3 bg-[#0F1629]/80 p-2 rounded-xl border border-cyan-500/20 hover:border-cyan-500/40 transition-colors">

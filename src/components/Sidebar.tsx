@@ -12,6 +12,7 @@ import {
   X,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   Bot,
   Calendar,
   Briefcase,
@@ -23,9 +24,11 @@ import { useAuth } from '../contexts/AuthContext';
 interface SidebarProps {
   currentView: string;
   onViewChange: (view: string) => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-export const Sidebar = ({ currentView, onViewChange }: SidebarProps) => {
+export const Sidebar = ({ currentView, onViewChange, isCollapsed = false, onToggleCollapse }: SidebarProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isEmpresaOpen, setIsEmpresaOpen] = useState(true);
 
@@ -76,24 +79,22 @@ export const Sidebar = ({ currentView, onViewChange }: SidebarProps) => {
   const canView = (id: string) => {
     if (!permissions) return false;
     if (permissions.admin === true) return true;
-
-    // Normalize id if needed (e.g. carregar-vendas vs carregar_vendas)
-    // Actually the structural IDs match what I defined in Grupos.tsx MENU_STRUCTURE
     return permissions[id]?.ver === true;
   };
 
-  const MenuItem = ({ item, isActive, onClick }: any) => {
+  const MenuItem = ({ item, isActive, onClick, isCollapsed: itemCollapsed }: any) => {
     const Icon = item.icon;
     return (
       <button
         onClick={onClick}
+        title={itemCollapsed ? item.label : undefined}
         className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${isActive
           ? 'bg-gradient-to-r from-cyan-500/20 to-cyan-600/20 text-cyan-400 shadow-lg shadow-cyan-500/20 border border-cyan-500/30'
           : 'text-gray-400 hover:text-cyan-400 hover:bg-cyan-500/10'
-          }`}
+          } ${itemCollapsed ? 'justify-center px-2' : ''}`}
       >
-        <Icon className="w-5 h-5" />
-        <span className="font-medium">{item.label}</span>
+        <Icon className="w-5 h-5 flex-shrink-0" />
+        {!itemCollapsed && <span className="font-medium truncate">{item.label}</span>}
       </button>
     );
   };
@@ -110,27 +111,40 @@ export const Sidebar = ({ currentView, onViewChange }: SidebarProps) => {
     const filteredIAItems = iaItems.filter(item => canView(item.id));
 
     return (
-      <div className="h-full flex flex-col bg-gradient-to-b from-[#0A0E27] via-[#0F1629] to-[#151B2D] border-r border-cyan-500/10">
-        <div className="p-6 border-b border-cyan-500/10">
+      <div className={`h-full flex flex-col bg-gradient-to-b from-[#0A0E27] via-[#0F1629] to-[#151B2D] border-r border-cyan-500/10 transition-all duration-300 relative ${isCollapsed ? 'w-20' : 'w-72'}`}>
+        <div className={`p-6 border-b border-cyan-500/10 flex items-center ${isCollapsed ? 'flex-col gap-4 px-4' : 'justify-between'}`}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-lg flex items-center justify-center shadow-lg shadow-cyan-500/50">
+            <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-lg flex items-center justify-center shadow-lg shadow-cyan-500/50 flex-shrink-0">
               <Building2 className="w-6 h-6 text-white" />
             </div>
-            <div>
-              <h2 className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-cyan-600 text-transparent bg-clip-text">
-                RH Inteligente
-              </h2>
-              <p className="text-xs text-gray-400">Gestão & Performance</p>
-            </div>
+            {!isCollapsed && (
+              <div>
+                <h2 className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-cyan-600 text-transparent bg-clip-text leading-tight">
+                  RH Inteligente
+                </h2>
+                <p className="text-xs text-gray-400 whitespace-nowrap">Gestão & Performance</p>
+              </div>
+            )}
           </div>
+
+          <button
+            onClick={onToggleCollapse}
+            className={`hidden lg:flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 ${isCollapsed
+              ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20'
+              : 'text-gray-500 hover:text-cyan-400 hover:bg-white/5'
+              }`}
+          >
+            {isCollapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+          </button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto custom-scrollbar">
           {filteredMenuItems.map((item) => (
             <MenuItem
               key={item.id}
               item={item}
               isActive={currentView === item.id}
+              isCollapsed={isCollapsed}
               onClick={() => {
                 onViewChange(item.id);
                 setIsOpen(false);
@@ -142,19 +156,41 @@ export const Sidebar = ({ currentView, onViewChange }: SidebarProps) => {
           {filteredEmpresaItems.length > 0 && (
             <div className="py-2">
               <button
-                onClick={() => setIsEmpresaOpen(!isEmpresaOpen)}
-                className="w-full flex items-center justify-between px-4 py-2 text-gray-300 hover:text-cyan-400 transition-colors"
+                onClick={() => !isCollapsed && setIsEmpresaOpen(!isEmpresaOpen)}
+                className={`w-full flex items-center justify-between px-4 py-2 text-gray-300 hover:text-cyan-400 transition-colors ${isCollapsed ? 'justify-center' : ''}`}
+                title={isCollapsed ? 'Gerenciador Empresa' : undefined}
               >
-                <span className="font-semibold">Gerenciador Empresa</span>
-                {isEmpresaOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                {isCollapsed ? <Building2 className="w-5 h-5" /> : (
+                  <>
+                    <span className="font-semibold text-xs text-gray-500 uppercase tracking-wider">Gerenciador Empresa</span>
+                    {isEmpresaOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                  </>
+                )}
               </button>
-              {isEmpresaOpen && (
+              {(!isCollapsed && isEmpresaOpen) && (
                 <div className="mt-1 space-y-1 pl-2">
                   {filteredEmpresaItems.map((item) => (
                     <MenuItem
                       key={item.id}
                       item={item}
                       isActive={currentView === item.id}
+                      isCollapsed={isCollapsed}
+                      onClick={() => {
+                        onViewChange(item.id);
+                        setIsOpen(false);
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+              {(isCollapsed) && (
+                <div className="space-y-1 mt-2">
+                  {filteredEmpresaItems.map((item) => (
+                    <MenuItem
+                      key={item.id}
+                      item={item}
+                      isActive={currentView === item.id}
+                      isCollapsed={isCollapsed}
                       onClick={() => {
                         onViewChange(item.id);
                         setIsOpen(false);
@@ -166,23 +202,45 @@ export const Sidebar = ({ currentView, onViewChange }: SidebarProps) => {
             </div>
           )}
 
-          {/* Gerenciador de Vendas */}
+          {/* Gerenciador de Vendas - Oculto temporariamente
           {filteredVendasItems.length > 0 && (
             <div className="py-2">
               <button
-                onClick={() => setIsVendasOpen(!isVendasOpen)}
-                className="w-full flex items-center justify-between px-4 py-2 text-gray-300 hover:text-cyan-400 transition-colors"
+                onClick={() => !isCollapsed && setIsVendasOpen(!isVendasOpen)}
+                className={`w-full flex items-center justify-between px-4 py-2 text-gray-300 hover:text-cyan-400 transition-colors ${isCollapsed ? 'justify-center' : ''}`}
+                title={isCollapsed ? 'Gerenciador de Vendas' : undefined}
               >
-                <span className="font-semibold">Gerenciador de Vendas</span>
-                {isVendasOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                {isCollapsed ? <LayoutDashboard className="w-5 h-5" /> : (
+                  <>
+                    <span className="font-semibold text-xs text-gray-500 uppercase tracking-wider">Vendas</span>
+                    {isVendasOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                  </>
+                )}
               </button>
-              {isVendasOpen && (
+              {(!isCollapsed && isVendasOpen) && (
                 <div className="mt-1 space-y-1 pl-2">
                   {filteredVendasItems.map((item) => (
                     <MenuItem
                       key={item.id}
                       item={item}
                       isActive={currentView === item.id}
+                      isCollapsed={isCollapsed}
+                      onClick={() => {
+                        onViewChange(item.id);
+                        setIsOpen(false);
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+              {isCollapsed && (
+                <div className="space-y-1 mt-2">
+                  {filteredVendasItems.map((item) => (
+                    <MenuItem
+                      key={item.id}
+                      item={item}
+                      isActive={currentView === item.id}
+                      isCollapsed={isCollapsed}
                       onClick={() => {
                         onViewChange(item.id);
                         setIsOpen(false);
@@ -193,24 +251,47 @@ export const Sidebar = ({ currentView, onViewChange }: SidebarProps) => {
               )}
             </div>
           )}
+          */}
 
           {/* Financeiro */}
           {filteredFinanceiroItems.length > 0 && (
             <div className="py-2">
               <button
-                onClick={() => setIsFinanceiroOpen(!isFinanceiroOpen)}
-                className="w-full flex items-center justify-between px-4 py-2 text-gray-300 hover:text-cyan-400 transition-colors"
+                onClick={() => !isCollapsed && setIsFinanceiroOpen(!isFinanceiroOpen)}
+                className={`w-full flex items-center justify-between px-4 py-2 text-gray-300 hover:text-cyan-400 transition-colors ${isCollapsed ? 'justify-center' : ''}`}
+                title={isCollapsed ? 'Financeiro' : undefined}
               >
-                <span className="font-semibold">Financeiro</span>
-                {isFinanceiroOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                {isCollapsed ? <DollarSign className="w-5 h-5" /> : (
+                  <>
+                    <span className="font-semibold text-xs text-gray-500 uppercase tracking-wider">Financeiro</span>
+                    {isFinanceiroOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                  </>
+                )}
               </button>
-              {isFinanceiroOpen && (
+              {(!isCollapsed && isFinanceiroOpen) && (
                 <div className="mt-1 space-y-1 pl-2">
                   {filteredFinanceiroItems.map((item) => (
                     <MenuItem
                       key={item.id}
                       item={item}
                       isActive={currentView === item.id}
+                      isCollapsed={isCollapsed}
+                      onClick={() => {
+                        onViewChange(item.id);
+                        setIsOpen(false);
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+              {isCollapsed && (
+                <div className="space-y-1 mt-2">
+                  {filteredFinanceiroItems.map((item) => (
+                    <MenuItem
+                      key={item.id}
+                      item={item}
+                      isActive={currentView === item.id}
+                      isCollapsed={isCollapsed}
                       onClick={() => {
                         onViewChange(item.id);
                         setIsOpen(false);
@@ -226,19 +307,41 @@ export const Sidebar = ({ currentView, onViewChange }: SidebarProps) => {
           {filteredIAItems.length > 0 && (
             <div className="py-2">
               <button
-                onClick={() => setIsIAOpen(!isIAOpen)}
-                className="w-full flex items-center justify-between px-4 py-2 text-gray-300 hover:text-cyan-400 transition-colors"
+                onClick={() => !isCollapsed && setIsIAOpen(!isIAOpen)}
+                className={`w-full flex items-center justify-between px-4 py-2 text-gray-300 hover:text-cyan-400 transition-colors ${isCollapsed ? 'justify-center' : ''}`}
+                title={isCollapsed ? 'RH Inteligente' : undefined}
               >
-                <span className="font-semibold">RH Inteligente</span>
-                {isIAOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                {isCollapsed ? <Bot className="w-5 h-5" /> : (
+                  <>
+                    <span className="font-semibold text-xs text-gray-500 uppercase tracking-wider">Inteligência</span>
+                    {isIAOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                  </>
+                )}
               </button>
-              {isIAOpen && (
+              {(!isCollapsed && isIAOpen) && (
                 <div className="mt-1 space-y-1 pl-2">
                   {filteredIAItems.map((item) => (
                     <MenuItem
                       key={item.id}
                       item={item}
                       isActive={currentView === item.id}
+                      isCollapsed={isCollapsed}
+                      onClick={() => {
+                        onViewChange(item.id);
+                        setIsOpen(false);
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+              {isCollapsed && (
+                <div className="space-y-1 mt-2">
+                  {filteredIAItems.map((item) => (
+                    <MenuItem
+                      key={item.id}
+                      item={item}
+                      isActive={currentView === item.id}
+                      isCollapsed={isCollapsed}
                       onClick={() => {
                         onViewChange(item.id);
                         setIsOpen(false);
@@ -251,13 +354,14 @@ export const Sidebar = ({ currentView, onViewChange }: SidebarProps) => {
           )}
         </nav>
 
-        <div className="p-4 border-t border-cyan-500/10">
+        <div className={`p-4 border-t border-cyan-500/10 ${isCollapsed ? 'px-2' : ''}`}>
           <button
             onClick={handleSignOut}
-            className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-lg transition-all duration-200"
+            title={isCollapsed ? 'Sair' : undefined}
+            className={`w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-lg transition-all duration-200 ${isCollapsed ? 'justify-center' : ''}`}
           >
-            <LogOut className="w-5 h-5" />
-            <span className="font-medium">Sair</span>
+            <LogOut className="w-5 h-5 flex-shrink-0" />
+            {!isCollapsed && <span className="font-medium">Sair</span>}
           </button>
         </div>
       </div>
@@ -273,7 +377,7 @@ export const Sidebar = ({ currentView, onViewChange }: SidebarProps) => {
         {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
       </button>
 
-      <aside className="hidden lg:block w-72 h-screen sticky top-0">
+      <aside className={`hidden lg:block h-screen sticky top-0 transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-72'}`}>
         <SidebarContent />
       </aside>
 

@@ -140,7 +140,6 @@ export const Setores = ({ permissions }: { permissions: any }) => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-cyan-400">Setores</h1>
-          <p className="text-gray-400 mt-1">Gerencie os setores das filiais</p>
         </div>
         {permissions?.editar && (
           <button

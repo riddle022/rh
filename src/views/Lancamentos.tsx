@@ -35,7 +35,7 @@ export const Lancamentos = ({ permissions }: { permissions: any }) => {
     const [ano, setAno] = useState<number>(new Date().getFullYear());
     const [valor, setValor] = useState<number>(0);
     const [descricao, setDescricao] = useState('');
-    const [dataLancamento, setDataLancamento] = useState(new Date().toISOString().split('T')[0]);
+    const [dataLancamento, setDataLancamento] = useState(new Date().toLocaleDateString('en-CA'));
     const [editingId, setEditingId] = useState<string | null>(null);
 
     // Filtering State
@@ -160,7 +160,7 @@ export const Lancamentos = ({ permissions }: { permissions: any }) => {
         setAno(new Date().getFullYear());
         setValor(0);
         setDescricao('');
-        setDataLancamento(new Date().toISOString().split('T')[0]);
+        setDataLancamento(new Date().toLocaleDateString('en-CA'));
     };
 
     const filteredFuncionarios = funcionarios.filter(f =>
@@ -193,7 +193,6 @@ export const Lancamentos = ({ permissions }: { permissions: any }) => {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold text-cyan-400">Lançamentos Financeiros</h1>
-                    <p className="text-gray-400 mt-1">Gestão de Comissões, Bonificações e Horas Extras</p>
                 </div>
                 {permissions?.editar && (
                     <button
@@ -332,7 +331,7 @@ export const Lancamentos = ({ permissions }: { permissions: any }) => {
                                             R$ {lanc.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-gray-400 text-sm">
-                                            {new Date(lanc.data_lancamento).toLocaleDateString('pt-BR')}
+                                            {lanc.data_lancamento.split('-').reverse().join('/')}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right space-x-2">
                                             {permissions?.editar && (

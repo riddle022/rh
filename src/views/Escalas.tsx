@@ -243,7 +243,6 @@ export const Escalas = ({ permissions }: { permissions: any }) => {
                     <div className="flex items-center justify-between">
                         <div>
                             <h1 className="text-3xl font-bold text-cyan-400">Escalas</h1>
-                            <p className="text-gray-400 mt-1">Selecione ou crie um grupo de escalas</p>
                         </div>
                         {permissions?.editar && (
                             <button

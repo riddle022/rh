@@ -18,6 +18,7 @@ import { ValeMercadoria } from './views/ValeMercadoria';
 import { GestaoTarefas } from './views/GestaoTarefas';
 import { Escalas } from './views/Escalas';
 import { Lancamentos } from './views/Lancamentos';
+import { BancoTalentos } from './views/BancoTalentos';
 import { Loader2 } from 'lucide-react';
 
 function AppContent() {
@@ -69,7 +70,7 @@ function AppContent() {
       case 'analise-curriculos':
         return <div className="text-white p-8">Analisador de Currículos (Em breve)</div>;
       case 'banco-talentos':
-        return <div className="text-white p-8">Banco de Talentos (Em breve)</div>;
+        return <BancoTalentos permissions={viewPerms} />;
       case 'tarefas':
         return <GestaoTarefas permissions={viewPerms} />;
       case 'escala':

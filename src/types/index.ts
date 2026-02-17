@@ -185,3 +185,59 @@ export interface LancamentoFinanceiro {
   created_at: string;
   funcionario?: Funcionario;
 }
+
+export type TaskStatus = 'Pendente' | 'Em Andamento' | 'Concluída';
+export type TaskPriority = 'Alta' | 'Média' | 'Baixa';
+export type TaskType = 'Entrevista' | 'Feedback' | 'Treinamento' | 'Documentação' | 'Geral';
+
+export interface Task {
+  id: string;
+  titulo: string;
+  descricao: string | null;
+  status: TaskStatus;
+  prioridade: TaskPriority;
+  tipo: TaskType;
+  data_vencimento: string;
+  funcionario_id: string | null;
+  created_at?: string;
+  updated_at?: string;
+  funcionario?: Funcionario;
+}
+export interface Candidato {
+  id: string;
+  nome: string;
+  email: string | null;
+  telefone: string | null;
+  cidade: string | null;
+  vaga_interesse: string | null;
+  status: 'disponivel' | 'em_processo' | 'contratado' | 'arquivado';
+  fonte: string | null;
+  escolaridade: string | null;
+  resumo_ia: string | null;
+  dados_estruturados: Record<string, any>;
+  tags: string[];
+  observacoes: string | null;
+  created_at: string;
+  updated_at: string;
+  entrevistas?: CandidatoEntrevista[];
+  anexos?: CandidatoAnexo[];
+}
+
+export interface CandidatoEntrevista {
+  id: string;
+  candidato_id: string;
+  data_entrevista: string;
+  recrutador_id: string;
+  notas: string | null;
+  resultado: string | null;
+  created_at: string;
+}
+
+export interface CandidatoAnexo {
+  id: string;
+  candidato_id: string;
+  nome_arquivo: string;
+  url_arquivo: string;
+  tipo_arquivo: 'curriculo' | 'portfolio' | 'outro';
+  created_at: string;
+}

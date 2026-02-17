@@ -350,7 +350,6 @@ export const ValeMercadoria = ({ permissions }: { permissions: any }) => {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold text-cyan-400">Vale Mercadoria</h1>
-                    <p className="text-gray-400 mt-1">Concessão e acompanhamento de vales para funcionários</p>
                 </div>
                 {permissions?.editar && (
                     <button

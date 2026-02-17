@@ -6,4 +6,41 @@
   select option {
     @apply bg-[#0F1629] text-gray-200;
   }
+
+  /* Professional Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-cyan-500/20 rounded-full transition-colors;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-cyan-500/40;
+  }
+
+  ::-webkit-scrollbar-button {
+    display: none;
+  }
+
+  /* Support for Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(6, 182, 212, 0.2) transparent;
+  }
+}
+
+/* Custom class for specific containers if needed */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-cyan-500/30 rounded-full;
 }

@@ -9,7 +9,7 @@ interface Message {
   timestamp: Date;
 }
 
-export const AssistenteIA = ({ permissions }: { permissions: any }) => {
+export const AssistenteIA = ({ permissions: _permissions }: { permissions: any }) => {
   const { confirm: confirmAction } = useNotification();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -120,9 +120,6 @@ export const AssistenteIA = ({ permissions }: { permissions: any }) => {
               <Bot className="w-8 h-8" />
               Assistente Comercial IA
             </h1>
-            <p className="text-gray-400 mt-1">
-              Especialista em análise de vendas e dados comerciais
-            </p>
           </div>
           {messages.length > 0 && (
             <button

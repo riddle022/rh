@@ -162,7 +162,6 @@ export const Vendedores = ({ permissions }: { permissions: any }) => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-cyan-400">Vendedores</h1>
-          <p className="text-gray-400 mt-1">Gerencie os vendedores da empresa</p>
         </div>
         {permissions?.editar && (
           <button

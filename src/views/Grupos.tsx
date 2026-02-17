@@ -80,7 +80,7 @@ const DEFAULT_PERMISSIONS = () => {
 };
 
 export const Grupos = ({ permissions }: { permissions: any }) => {
-  const { showToast, confirm: confirmAction } = useNotification();
+  const { confirm: confirmAction } = useNotification();
   const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -218,7 +218,6 @@ export const Grupos = ({ permissions }: { permissions: any }) => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-cyan-400">Grupos</h1>
-          <p className="text-gray-400 mt-1">Gerencie grupos e permissões</p>
         </div>
         {canEdit && (
           <button
