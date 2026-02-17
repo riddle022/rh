@@ -1,0 +1,5 @@
+This is a placeholder. In production, you would replace this with actual PNG icon files.
+For now, the app will work without icons, but you should create:
+- icon-192.png (192x192 pixels)
+- icon-512.png (512x512 pixels)
+Both should be PNG files with a cyan/turquoise theme matching the app design.
