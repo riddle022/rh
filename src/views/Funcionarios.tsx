@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Users, Loader2, Search, Calendar, DollarSign, Clock, FileText } from 'lucide-react';
+import { Plus, Edit2, Trash2, Users, Loader2, Search, Calendar, DollarSign, Clock, FileText, Building2, Network } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNotification } from '../context/NotificationContext';
 import { Card } from '../components/ui/Card';
@@ -19,6 +19,9 @@ export const Funcionarios = ({ onViewChange, permissions }: { onViewChange: (vie
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingFuncionario, setEditingFuncionario] = useState<Funcionario | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [filterFilial, setFilterFilial] = useState('');
+    const [filterDepartamento, setFilterDepartamento] = useState('');
+    const [filterCargo, setFilterCargo] = useState('');
     const [activeTab, setActiveTab] = useState<'geral' | 'financeiro' | 'ocorrencias'>('geral');
 
     const [formData, setFormData] = useState({
@@ -70,6 +73,16 @@ export const Funcionarios = ({ onViewChange, permissions }: { onViewChange: (vie
             setFilteredCargos([]);
         }
     }, [formData.departamento_id, cargos]);
+
+    // Filters logic for the list
+    const filteredCargosForFilter = useMemo(() => {
+        if (!filterDepartamento) return cargos;
+        return cargos.filter(c => c.departamento_id === filterDepartamento);
+    }, [filterDepartamento, cargos]);
+
+    useEffect(() => {
+        setFilterCargo('');
+    }, [filterDepartamento]);
 
     const fetchData = async () => {
         try {
@@ -252,9 +265,13 @@ export const Funcionarios = ({ onViewChange, permissions }: { onViewChange: (vie
         });
     };
 
-    const filteredFuncionarios = funcionarios.filter(f =>
-        f.nome.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredFuncionarios = funcionarios.filter(f => {
+        const matchesSearch = f.nome.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesFilial = !filterFilial || f.filial_id === filterFilial;
+        const matchesDepto = !filterDepartamento || f.departamento_id === filterDepartamento;
+        const matchesCargo = !filterCargo || f.cargo_id === filterCargo;
+        return matchesSearch && matchesFilial && matchesDepto && matchesCargo;
+    });
 
     if (loading) {
         return (
@@ -281,76 +298,130 @@ export const Funcionarios = ({ onViewChange, permissions }: { onViewChange: (vie
                 )}
             </div>
 
-            <div className="relative">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                    type="text"
-                    placeholder="Buscar por nome..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 bg-[#0F1629] border border-cyan-500/20 rounded-lg text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="relative">
+                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                        type="text"
+                        placeholder="Nome..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-12 pr-4 py-2.5 bg-[#0F1629] border border-cyan-500/20 rounded-lg text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    />
+                </div>
+                <select
+                    value={filterFilial}
+                    onChange={(e) => setFilterFilial(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-[#0F1629] border border-cyan-500/20 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                    <option value="">Todas as Filiais</option>
+                    {filiais.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
+                </select>
+                <select
+                    value={filterDepartamento}
+                    onChange={(e) => setFilterDepartamento(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-[#0F1629] border border-cyan-500/20 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                    <option value="">Todos os Deptos</option>
+                    {departamentos.map(d => <option key={d.id} value={d.id}>{d.nome}</option>)}
+                </select>
+                <select
+                    value={filterCargo}
+                    onChange={(e) => setFilterCargo(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-[#0F1629] border border-cyan-500/20 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                    <option value="">Todos los Cargos</option>
+                    {filteredCargosForFilter.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                </select>
+                <div className="flex items-end">
+                    <button
+                        onClick={() => {
+                            setSearchTerm('');
+                            setFilterFilial('');
+                            setFilterDepartamento('');
+                            setFilterCargo('');
+                        }}
+                        className="w-full px-4 py-2.5 bg-gray-700/50 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors border border-gray-600 text-sm font-medium"
+                    >
+                        Limpar Filtros
+                    </button>
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredFuncionarios.map((f) => (
-                    <Card key={f.id} className="p-6">
-                        <div className="flex items-start justify-between mb-4">
-                            <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-lg flex items-center justify-center shadow-lg">
-                                    <Users className="w-6 h-6 text-white" />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-bold text-gray-200">{f.nome}</h3>
-                                    <p className="text-sm text-cyan-400/80">{f.cargo_rel?.nome || 'Sem cargo'}</p>
-                                </div>
-                            </div>
-                            <div className={`px-2 py-1 rounded text-xs font-semibold ${f.ativo ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                                {f.ativo ? 'Ativo' : 'Inativo'}
-                            </div>
-                        </div>
-
-                        <div className="space-y-2 mb-6">
-                            <div className="flex items-center gap-2 text-sm text-gray-400">
-                                <Calendar className="w-4 h-4" />
-                                <span>Admissão: {f.data_admissao.split('-').reverse().join('/')}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-gray-400">
-                                <DollarSign className="w-4 h-4" />
-                                <span>Salário: {f.salario_base.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                            </div>
-                            <button
-                                onClick={() => onViewChange('escala')}
-                                className="flex items-center gap-2 text-sm text-cyan-400 hover:text-cyan-300 transition-colors py-1"
-                            >
-                                <Clock className="w-4 h-4" />
-                                <span className="underline">Ver escala completa</span>
-                            </button>
-                        </div>
-
-                        <div className="flex gap-2">
-                            {permissions?.editar && (
-                                <button
-                                    onClick={() => handleEdit(f)}
-                                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 rounded-lg transition-colors border border-cyan-500/20"
-                                >
-                                    <Edit2 className="w-4 h-4" />
-                                    Ficha Técnica
-                                </button>
-                            )}
-                            {permissions?.excluir && (
-                                <button
-                                    onClick={() => handleDelete(f.id)}
-                                    className="flex items-center justify-center p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
-                                    title="Excluir"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            )}
-                        </div>
-                    </Card>
-                ))}
-            </div>
+            <Card className="overflow-hidden border-cyan-500/10">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[1400px]">
+                        <thead>
+                            <tr className="bg-[#151B2D]">
+                                <th className="p-4 border-b border-cyan-500/10 text-xs font-bold text-cyan-400 uppercase tracking-wider">Status</th>
+                                <th className="p-4 border-b border-cyan-500/10 text-xs font-bold text-cyan-400 uppercase tracking-wider">Nome Completo</th>
+                                <th className="p-4 border-b border-cyan-500/10 text-xs font-bold text-cyan-400 uppercase tracking-wider text-center">RG</th>
+                                <th className="p-4 border-b border-cyan-500/10 text-xs font-bold text-cyan-400 uppercase tracking-wider text-center">CPF</th>
+                                <th className="p-4 border-b border-cyan-500/10 text-xs font-bold text-cyan-400 uppercase tracking-wider text-center">Celular</th>
+                                <th className="p-4 border-b border-cyan-500/10 text-xs font-bold text-cyan-400 uppercase tracking-wider">Email</th>
+                                <th className="p-4 border-b border-cyan-500/10 text-xs font-bold text-cyan-400 uppercase tracking-wider text-center">Nascimento</th>
+                                <th className="p-4 border-b border-cyan-500/10 text-xs font-bold text-cyan-400 uppercase tracking-wider">Cargo</th>
+                                <th className="p-4 border-b border-cyan-500/10 text-xs font-bold text-cyan-400 uppercase tracking-wider">Departamento</th>
+                                <th className="p-4 border-b border-cyan-500/10 text-xs font-bold text-cyan-400 uppercase tracking-wider text-center">Admissão</th>
+                                <th className="p-4 border-b border-cyan-500/10 text-xs font-bold text-cyan-400 uppercase tracking-wider text-right">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-cyan-500/5">
+                            {filteredFuncionarios.map((f) => (
+                                <tr key={f.id} className="hover:bg-cyan-500/5 transition-colors group">
+                                    <td className="p-4">
+                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${f.ativo ? 'bg-green-500/20 text-green-400 border-green-500/20' : 'bg-red-500/20 text-red-400 border-red-500/20'}`}>
+                                            {f.ativo ? 'Ativo' : 'Inativo'}
+                                        </span>
+                                    </td>
+                                    <td className="p-4">
+                                        <span className="font-bold text-gray-200 text-sm whitespace-nowrap">{f.nome}</span>
+                                    </td>
+                                    <td className="p-4 text-center text-xs text-gray-400 whitespace-nowrap">{f.documento || '-'}</td>
+                                    <td className="p-4 text-center text-xs text-gray-400 whitespace-nowrap">{f.cpf || '-'}</td>
+                                    <td className="p-4 text-center text-xs text-gray-400 whitespace-nowrap">{f.celular || '-'}</td>
+                                    <td className="p-4 text-xs text-gray-400 truncate max-w-[150px]">{f.email || '-'}</td>
+                                    <td className="p-4 text-center text-xs text-gray-400 whitespace-nowrap">
+                                        {f.data_nascimento ? f.data_nascimento.split('-').reverse().join('/') : '-'}
+                                    </td>
+                                    <td className="p-4">
+                                        <span className="text-xs text-cyan-400 font-medium whitespace-nowrap">{f.cargo_rel?.nome || '-'}</span>
+                                    </td>
+                                    <td className="p-4">
+                                        <span className="text-xs text-gray-400 whitespace-nowrap">{f.departamento?.nome || 'Operacional'}</span>
+                                    </td>
+                                    <td className="p-4 text-center text-xs text-gray-400 font-bold whitespace-nowrap">
+                                        {f.data_admissao.split('-').reverse().join('/')}
+                                    </td>
+                                    <td className="p-4 text-right">
+                                        <div className="flex items-center justify-end gap-2">
+                                            {permissions?.editar && (
+                                                <button
+                                                    onClick={() => handleEdit(f)}
+                                                    className="flex items-center gap-1 px-3 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 rounded-lg transition-colors border border-cyan-500/20 text-[10px] font-bold uppercase tracking-tight"
+                                                    title="Ficha Técnica"
+                                                >
+                                                    <Edit2 className="w-3.5 h-3.5" />
+                                                    Ver Ficha
+                                                </button>
+                                            )}
+                                            {permissions?.excluir && (
+                                                <button
+                                                    onClick={() => handleDelete(f.id)}
+                                                    className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors border border-red-500/10"
+                                                    title="Excluir"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </Card>
 
             <Modal
                 isOpen={isModalOpen}

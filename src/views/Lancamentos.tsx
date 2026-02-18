@@ -11,8 +11,12 @@ import {
     ChevronRight,
     TrendingUp,
     Gift,
-    Clock
+    Clock,
+    Filter,
+    X,
+    ChevronDown
 } from 'lucide-react';
+import { useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNotification } from '../context/NotificationContext';
 import { Card } from '../components/ui/Card';
@@ -41,6 +45,21 @@ export const Lancamentos = ({ permissions }: { permissions: any }) => {
     // Filtering State
     const [selectedMonthFilter, setSelectedMonthFilter] = useState<number | 'all'>(new Date().getMonth() + 1);
     const [selectedYearFilter, setSelectedYearFilter] = useState<number | 'all'>(new Date().getFullYear());
+    const [filterTipo, setFilterTipo] = useState<string>('all');
+    const [filterReferencia, setFilterReferencia] = useState<string>('');
+    const [filterData, setFilterData] = useState<string>('');
+    const [openFilter, setOpenFilter] = useState<string | null>(null);
+    const filterRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+                setOpenFilter(null);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     useEffect(() => {
         fetchData();
@@ -171,7 +190,13 @@ export const Lancamentos = ({ permissions }: { permissions: any }) => {
         const matchesSearch = lanc.funcionario?.nome.toLowerCase().includes(listSearchTerm.toLowerCase());
         const matchesMonth = selectedMonthFilter === 'all' || lanc.mes === selectedMonthFilter;
         const matchesYear = selectedYearFilter === 'all' || lanc.ano === selectedYearFilter;
-        return matchesSearch && matchesMonth && matchesYear;
+        const matchesTipo = filterTipo === 'all' || lanc.tipo === filterTipo;
+        const refStr = `${String(lanc.mes).padStart(2, '0')}/${lanc.ano}`;
+        const matchesRef = !filterReferencia || refStr.includes(filterReferencia);
+        const dataStr = lanc.data_lancamento.split('-').reverse().join('/');
+        const matchesData = !filterData || dataStr.includes(filterData);
+
+        return matchesSearch && matchesMonth && matchesYear && matchesTipo && matchesRef && matchesData;
     });
 
     const totals = {
@@ -249,7 +274,7 @@ export const Lancamentos = ({ permissions }: { permissions: any }) => {
                 </Card>
             </div>
 
-            <Card className="bg-[#0F1629]/50 border-cyan-500/10 overflow-hidden">
+            <Card className="bg-[#0F1629]/50 border-cyan-500/10">
                 <div className="p-6 border-b border-cyan-500/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <h2 className="text-xl font-bold text-gray-200">Histórico de Lançamentos</h2>
 
@@ -294,15 +319,102 @@ export const Lancamentos = ({ permissions }: { permissions: any }) => {
                     </div>
                 </div>
 
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto overflow-y-visible min-h-[400px] transition-all">
                     <table className="w-full">
-                        <thead>
+                        <thead className="sticky top-0 z-20">
                             <tr className="text-left bg-cyan-500/5">
-                                <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider">Funcionário</th>
-                                <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider">Tipo</th>
-                                <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider">Referência</th>
+                                <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider relative">
+                                    <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setOpenFilter(openFilter === 'funcionario' ? null : 'funcionario')}>
+                                        Funcionário
+                                        <Filter className={`w-3 h-3 transition-colors ${openFilter === 'funcionario' ? 'text-cyan-400' : 'text-cyan-500/50 cursor-pointer hover:text-cyan-400'}`} />
+                                    </div>
+                                    {openFilter === 'funcionario' && (
+                                        <div ref={filterRef} className="absolute z-[100] top-full left-0 mt-1 p-2 bg-[#151B2D] border border-cyan-500/20 rounded-lg shadow-2xl min-w-[180px]">
+                                            <div className="flex items-center justify-between mb-1.5 px-1">
+                                                <span className="text-[9px] text-gray-400 uppercase font-bold">Filtrar</span>
+                                                <button onClick={() => setOpenFilter(null)}><X className="w-3 h-3 text-gray-500 hover:text-white" /></button>
+                                            </div>
+                                            <input
+                                                type="text"
+                                                placeholder="Buscar..."
+                                                value={listSearchTerm}
+                                                onChange={(e) => setListSearchTerm(e.target.value)}
+                                                className="w-full bg-[#0F1629] border border-cyan-500/10 rounded px-2 py-1.5 text-xs text-gray-200 focus:ring-1 focus:ring-cyan-500 focus:outline-none placeholder:text-gray-600"
+                                                autoFocus
+                                            />
+                                        </div>
+                                    )}
+                                </th>
+                                <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider relative">
+                                    <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setOpenFilter(openFilter === 'tipo' ? null : 'tipo')}>
+                                        Tipo
+                                        <Filter className={`w-3 h-3 transition-colors ${openFilter === 'tipo' ? 'text-cyan-400' : 'text-cyan-500/50 cursor-pointer hover:text-cyan-400'}`} />
+                                    </div>
+                                    {openFilter === 'tipo' && (
+                                        <div ref={filterRef} className="absolute z-[100] top-full left-0 mt-1 p-2 bg-[#151B2D] border border-cyan-500/20 rounded-lg shadow-2xl min-w-[140px]">
+                                            <div className="flex items-center justify-between mb-1 px-1">
+                                                <span className="text-[9px] text-gray-400 uppercase font-bold">Tipo</span>
+                                                <button onClick={() => setOpenFilter(null)}><X className="w-3 h-3 text-gray-500 hover:text-white" /></button>
+                                            </div>
+                                            <div className="space-y-0.5">
+                                                {['all', 'Comissao', 'Bonificacao', 'Horas extras'].map(t => (
+                                                    <button
+                                                        key={t}
+                                                        onClick={() => { setFilterTipo(t); setOpenFilter(null); }}
+                                                        className={`w-full text-left px-2 py-1 rounded text-xs transition-colors ${filterTipo === t ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-400 hover:bg-white/5'}`}
+                                                    >
+                                                        {t === 'all' ? 'Todos' : t === 'Comissao' ? 'Comissão' : t === 'Bonificacao' ? 'Bonificação' : 'H. Extras'}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </th>
+                                <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider relative">
+                                    <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setOpenFilter(openFilter === 'referencia' ? null : 'referencia')}>
+                                        Referência
+                                        <Filter className={`w-3 h-3 transition-colors ${openFilter === 'referencia' ? 'text-cyan-400' : 'text-cyan-500/50 cursor-pointer hover:text-cyan-400'}`} />
+                                    </div>
+                                    {openFilter === 'referencia' && (
+                                        <div ref={filterRef} className="absolute z-[100] top-full left-0 mt-1 p-2 bg-[#151B2D] border border-cyan-500/20 rounded-lg shadow-2xl min-w-[150px]">
+                                            <div className="flex items-center justify-between mb-1.5 px-1">
+                                                <span className="text-[9px] text-gray-400 uppercase font-bold">Mês/Ano</span>
+                                                <button onClick={() => setOpenFilter(null)}><X className="w-3 h-3 text-gray-500 hover:text-white" /></button>
+                                            </div>
+                                            <input
+                                                type="text"
+                                                placeholder="..."
+                                                value={filterReferencia}
+                                                onChange={(e) => setFilterReferencia(e.target.value)}
+                                                className="w-full bg-[#0F1629] border border-cyan-500/10 rounded px-2 py-1.5 text-xs text-gray-200 focus:ring-1 focus:ring-cyan-500 focus:outline-none placeholder:text-gray-600"
+                                                autoFocus
+                                            />
+                                        </div>
+                                    )}
+                                </th>
                                 <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider">Valor</th>
-                                <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider">Data Registro</th>
+                                <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider relative">
+                                    <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setOpenFilter(openFilter === 'data' ? null : 'data')}>
+                                        Data Registro
+                                        <Filter className={`w-3 h-3 transition-colors ${openFilter === 'data' ? 'text-cyan-400' : 'text-cyan-500/50 cursor-pointer hover:text-cyan-400'}`} />
+                                    </div>
+                                    {openFilter === 'data' && (
+                                        <div ref={filterRef} className="absolute z-[100] top-full right-0 mt-1 p-2 bg-[#151B2D] border border-cyan-500/20 rounded-lg shadow-2xl min-w-[150px]">
+                                            <div className="flex items-center justify-between mb-1.5 px-1">
+                                                <span className="text-[9px] text-gray-400 uppercase font-bold">Data</span>
+                                                <button onClick={() => setOpenFilter(null)}><X className="w-3 h-3 text-gray-500 hover:text-white" /></button>
+                                            </div>
+                                            <input
+                                                type="text"
+                                                placeholder="..."
+                                                value={filterData}
+                                                onChange={(e) => setFilterData(e.target.value)}
+                                                className="w-full bg-[#0F1629] border border-cyan-500/10 rounded px-2 py-1.5 text-xs text-gray-200 focus:ring-1 focus:ring-cyan-500 focus:outline-none placeholder:text-gray-600"
+                                                autoFocus
+                                            />
+                                        </div>
+                                    )}
+                                </th>
                                 <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider text-right">Ações</th>
                             </tr>
                         </thead>

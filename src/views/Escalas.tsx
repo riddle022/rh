@@ -6,12 +6,14 @@ import {
     Building2,
     Users,
     Save,
-    Loader2
+    Loader2,
+    FileText
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Card } from '../components/ui/Card';
 import { Modal } from '../components/ui/Modal';
 import { useNotification } from '../context/NotificationContext';
+import { exportEscalaToPdf } from '../utils/escalaPdfExport';
 import type { EscalaGrupo, Escala, EscalaEntrada, Funcionario, Filial } from '../types';
 
 export const Escalas = ({ permissions }: { permissions: any }) => {
@@ -309,6 +311,22 @@ export const Escalas = ({ permissions }: { permissions: any }) => {
                                 >
                                     {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                                     Salvar Escala
+                                </button>
+                            )}
+                            {activeTab && (
+                                <button
+                                    onClick={() => exportEscalaToPdf({
+                                        escala: activeTab,
+                                        entries,
+                                        funcionarios,
+                                        days: daysInMonth,
+                                        filialNome: filiais.find(f => f.id === selectedGroup?.filial_id)?.nome || '',
+                                        grupoNome: selectedGroup?.nome || ''
+                                    })}
+                                    className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold rounded-lg shadow-lg shadow-cyan-500/30 transition-all"
+                                >
+                                    <FileText className="w-5 h-5" />
+                                    Exportar PDF
                                 </button>
                             )}
                         </div>
