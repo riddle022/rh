@@ -22,8 +22,14 @@ export const BancoTalentos = ({ permissions }: { permissions: any }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const [activeTab, setActiveTab] = useState<'upload' | 'manual'>('upload');
-    const [profileTab, setProfileTab] = useState<'geral' | 'entrevistas' | 'documentos'>('geral');
+    const [profileTab, setProfileTab] = useState<'geral' | 'entrevistas'>('geral');
     const [extractedData, setExtractedData] = useState<any>(null);
+    const [isInterviewModalOpen, setIsInterviewModalOpen] = useState(false);
+    const [interviewForm, setInterviewForm] = useState({
+        data_entrevista: new Date().toISOString().split('T')[0],
+        notas: '',
+        resultado: 'Pendente'
+    });
 
     // Form States
     const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -229,6 +235,53 @@ export const BancoTalentos = ({ permissions }: { permissions: any }) => {
         setSelectedCandidato(null);
         setIsAnalyzing(false);
         setExtractedData(null);
+        setIsInterviewModalOpen(false);
+        setInterviewForm({
+            data_entrevista: new Date().toISOString().split('T')[0],
+            notas: '',
+            resultado: 'Pendente'
+        });
+    };
+
+    const handleSaveInterview = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedCandidato) return;
+
+        try {
+            const { error } = await supabase
+                .from('candidato_entrevistas')
+                .insert([{
+                    candidato_id: selectedCandidato.id,
+                    ...interviewForm
+                }]);
+
+            if (error) throw error;
+
+            showToast('Anotação salva com sucesso!', 'success');
+            setIsInterviewModalOpen(false);
+            setInterviewForm({
+                data_entrevista: new Date().toISOString().split('T')[0],
+                notas: '',
+                resultado: 'Pendente'
+            });
+
+            // Refetch current candidate to show new interview
+            const { data: updatedCandidato, error: fetchError } = await supabase
+                .from('candidatos')
+                .select('*, entrevistas:candidato_entrevistas(*), anexos:candidato_anexos(*)')
+                .eq('id', selectedCandidato.id)
+                .single();
+
+            if (!fetchError && updatedCandidato) {
+                setSelectedCandidato(updatedCandidato);
+                // Also update in the list
+                setCandidatos(prev => prev.map(c => c.id === updatedCandidato.id ? updatedCandidato : c));
+            }
+
+        } catch (error) {
+            console.error('Error saving interview:', error);
+            showToast('Erro ao salvar anotação', 'error');
+        }
     };
 
     const handleAddTag = () => {
@@ -714,12 +767,6 @@ export const BancoTalentos = ({ permissions }: { permissions: any }) => {
                             >
                                 <span className="flex items-center gap-2"><MessageSquare className="w-4 h-4" /> Entrevistas</span>
                             </button>
-                            <button
-                                onClick={() => setProfileTab('documentos')}
-                                className={`px-6 py-3 font-bold transition-all border-b-2 ${profileTab === 'documentos' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-gray-400 hover:text-gray-200'}`}
-                            >
-                                <span className="flex items-center gap-2"><FileText className="w-4 h-4" /> Documentos</span>
-                            </button>
                         </div>
 
                         <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
@@ -776,7 +823,10 @@ export const BancoTalentos = ({ permissions }: { permissions: any }) => {
                                 <div className="space-y-6">
                                     <div className="flex items-center justify-between">
                                         <h4 className="text-lg font-bold text-gray-200">Histórico de Processos</h4>
-                                        <button className="flex items-center gap-2 px-4 py-2 bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 rounded-lg hover:bg-cyan-500/20 transition-all font-bold text-sm">
+                                        <button
+                                            onClick={() => setIsInterviewModalOpen(true)}
+                                            className="flex items-center gap-2 px-4 py-2 bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 rounded-lg hover:bg-cyan-500/20 transition-all font-bold text-sm"
+                                        >
                                             <Plus className="w-4 h-4" /> Nova Anotação
                                         </button>
                                     </div>
@@ -806,35 +856,69 @@ export const BancoTalentos = ({ permissions }: { permissions: any }) => {
                                 </div>
                             )}
 
-                            {profileTab === 'documentos' && (
-                                <div className="space-y-4">
-                                    <h4 className="text-lg font-bold text-gray-200 mb-4">Arquivos & Anexos</h4>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="p-4 bg-[#0A0E27] border border-cyan-500/10 rounded-2xl flex items-center justify-between group hover:border-cyan-500/30 transition-all shadow-md">
-                                            <div className="flex items-center gap-3">
-                                                <div className="p-3 bg-red-500/10 text-red-400 rounded-xl group-hover:bg-red-500/20 transition-colors">
-                                                    <FileText className="w-6 h-6" />
-                                                </div>
-                                                <div>
-                                                    <h5 className="text-sm font-bold text-gray-200">Curriculo_Vendedor.pdf</h5>
-                                                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Currículo Original</p>
-                                                </div>
-                                            </div>
-                                            <button className="p-2 text-gray-400 hover:text-cyan-400 transition-colors">
-                                                <ExternalLink className="w-5 h-5" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div className="p-8 border-2 border-dashed border-gray-700 rounded-2xl flex flex-col items-center justify-center bg-gray-800/20 hover:bg-gray-800/30 transition-all cursor-pointer">
-                                        <Plus className="w-10 h-10 text-gray-600 mb-2" />
-                                        <p className="text-gray-500 font-semibold">Adicionar Anexo</p>
-                                        <p className="text-[10px] text-gray-600 uppercase mt-1">PDF, PNG, JPG até 10MB</p>
-                                    </div>
-                                </div>
-                            )}
+
                         </div>
                     </div>
                 )}
+            </Modal>
+
+            {/* Modal de Nova Anotação de Entrevista */}
+            <Modal
+                isOpen={isInterviewModalOpen}
+                onClose={() => setIsInterviewModalOpen(false)}
+                title="Nova Anotação de Entrevista"
+                maxWidth="max-w-md"
+            >
+                <form onSubmit={handleSaveInterview} className="space-y-4 p-2">
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-400 mb-1">Data da Entrevista</label>
+                        <input
+                            type="date"
+                            value={interviewForm.data_entrevista}
+                            onChange={(e) => setInterviewForm({ ...interviewForm, data_entrevista: e.target.value })}
+                            className="w-full px-4 py-2 bg-[#0A0E27] border border-gray-700 rounded-lg text-gray-200 focus:ring-2 focus:ring-cyan-500/50 outline-none"
+                            required
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-400 mb-1">Resultado / Status</label>
+                        <select
+                            value={interviewForm.resultado}
+                            onChange={(e) => setInterviewForm({ ...interviewForm, resultado: e.target.value })}
+                            className="w-full px-4 py-2 bg-[#0A0E27] border border-gray-700 rounded-lg text-gray-200 focus:ring-2 focus:ring-cyan-500/50 outline-none"
+                        >
+                            <option value="Pendente">Pendente</option>
+                            <option value="Aprovado">Aprovado</option>
+                            <option value="Reprovado">Reprovado</option>
+                            <option value="Em análise">Em análise</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-400 mb-1">Notas / Observações</label>
+                        <textarea
+                            value={interviewForm.notas}
+                            onChange={(e) => setInterviewForm({ ...interviewForm, notas: e.target.value })}
+                            className="w-full px-4 py-2 bg-[#0A0E27] border border-gray-700 rounded-lg text-gray-200 focus:ring-2 focus:ring-cyan-500/50 outline-none h-32 resize-none custom-scrollbar"
+                            placeholder="Descreva como foi a entrevista, pontos positivos e negativos..."
+                            required
+                        />
+                    </div>
+                    <div className="flex gap-3 pt-2">
+                        <button
+                            type="button"
+                            onClick={() => setIsInterviewModalOpen(false)}
+                            className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-lg transition-all"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            className="flex-1 py-2 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-400 hover:to-cyan-500 text-white font-bold rounded-lg shadow-lg shadow-cyan-500/30 transition-all font-bold"
+                        >
+                            Salvar
+                        </button>
+                    </div>
+                </form>
             </Modal>
         </div>
     );

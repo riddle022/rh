@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
     Loader2,
     Search,
@@ -11,13 +11,17 @@ import {
     Trash2,
     Check,
     X as CloseIcon,
-    Calendar as CalendarIcon
+    Calendar as CalendarIcon,
+    Filter,
+    FileText
 } from 'lucide-react';
+import { useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNotification } from '../context/NotificationContext';
 import { Card } from '../components/ui/Card';
 import { Modal } from '../components/ui/Modal';
-import type { Funcionario, ValeMercadoriaData, ValeMercadoriaParcela } from '../types';
+import type { Funcionario, ValeMercadoriaData, ValeMercadoriaParcela, Filial } from '../types';
+import { exportValeMercadoriaToPdf } from '../utils/valeMercadoriaPdfExport';
 
 interface Installment {
     id: string;
@@ -52,6 +56,13 @@ export const ValeMercadoria = ({ permissions }: { permissions: any }) => {
     const [listSearchTerm, setListSearchTerm] = useState('');
     const [selectedMonth, setSelectedMonth] = useState<number | 'all'>(new Date().getMonth() + 1);
     const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear());
+    const [filterFilial, setFilterFilial] = useState<string>('all');
+    const [filterStatus, setFilterStatus] = useState<string>('all');
+    const [filterData, setFilterData] = useState<string>('');
+    const [filterTotal, setFilterTotal] = useState<string>('');
+    const [filiais, setFiliais] = useState<Filial[]>([]);
+    const [openFilter, setOpenFilter] = useState<string | null>(null);
+    const filterRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         fetchData();
@@ -67,17 +78,62 @@ export const ValeMercadoria = ({ permissions }: { permissions: any }) => {
 
             const { data: valesData } = await supabase
                 .from('vales_mercadoria')
-                .select('*, funcionario:funcionarios(*), parcelas:vales_mercadoria_parcelas(*)')
+                .select('*, funcionario:funcionarios(*, filial:filiais(*)), parcelas:vales_mercadoria_parcelas(*)')
                 .order('created_at', { ascending: false });
+
+            const { data: filialData } = await supabase
+                .from('filiais')
+                .select('*')
+                .order('nome');
 
             setFuncionarios(funcData || []);
             setVales(valesData || []);
+            setFiliais(filialData || []);
         } catch (error) {
             console.error('Error fetching data:', error);
         } finally {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+                setOpenFilter(null);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const filteredVales = useMemo(() => {
+        return vales.filter(vale => {
+            const matchesSearch = vale.funcionario?.nome.toLowerCase().includes(listSearchTerm.toLowerCase());
+            const matchesFilial = filterFilial === 'all' || vale.funcionario?.filial?.nome === filterFilial;
+            const matchesStatus = filterStatus === 'all' || vale.status === filterStatus;
+            const matchesData = !filterData || new Date(vale.created_at).toLocaleDateString('pt-BR').includes(filterData);
+            const matchesTotal = !filterTotal || vale.valor_total.toString().includes(filterTotal);
+
+            let matchesMonthYear = true;
+            if (selectedMonth !== 'all' || selectedYear !== 'all') {
+                matchesMonthYear = vale.parcelas?.some(p => {
+                    const dueDate = new Date(p.data_vencimento);
+                    const pMonth = dueDate.getMonth() + 1;
+                    const pYear = dueDate.getFullYear();
+                    const monthMatch = selectedMonth === 'all' || pMonth === selectedMonth;
+                    const yearMatch = selectedYear === 'all' || pYear === selectedYear;
+                    return monthMatch && yearMatch && !p.pago;
+                }) || false;
+            }
+
+            return matchesSearch && matchesFilial && matchesStatus && matchesData && matchesTotal && matchesMonthYear;
+        });
+    }, [vales, listSearchTerm, filterFilial, filterStatus, filterData, filterTotal, selectedMonth, selectedYear]);
+
+    const filteredTotal = useMemo(() => {
+        return filteredVales.reduce((acc: number, v: ValeMercadoriaData) => acc + v.valor_total, 0);
+    }, [filteredVales]);
 
     // Automated Calculation Logic
     useEffect(() => {
@@ -315,27 +371,23 @@ export const ValeMercadoria = ({ permissions }: { permissions: any }) => {
     const filteredFuncionarios = funcionarios.filter(f =>
         f.nome.toLowerCase().includes(searchTerm.toLowerCase())
     );
-
-    const filteredVales = vales.filter(vale => {
-        const matchesSearch = vale.funcionario?.nome.toLowerCase().includes(listSearchTerm.toLowerCase());
-
-        let matchesDate = true;
-        if (selectedMonth !== 'all' || selectedYear !== 'all') {
-            matchesDate = vale.parcelas?.some(p => {
-                const dueDate = new Date(p.data_vencimento);
-                const pMonth = dueDate.getMonth() + 1;
-                const pYear = dueDate.getFullYear();
-
-                const monthMatch = selectedMonth === 'all' || pMonth === selectedMonth;
-                const yearMatch = selectedYear === 'all' || pYear === selectedYear;
-                const isUnpaid = !p.pago;
-
-                return monthMatch && yearMatch && isUnpaid;
-            }) || false;
-        }
-
-        return matchesSearch && matchesDate;
-    });
+    const handleExportPDF = () => {
+        exportValeMercadoriaToPdf({
+            vales: filteredVales,
+            periodo: {
+                mes: selectedMonth,
+                ano: selectedYear
+            },
+            filtros: {
+                funcionario: listSearchTerm || undefined,
+                filial: filterFilial !== 'all' ? filterFilial : undefined,
+                status: filterStatus !== 'all' ? filterStatus : undefined,
+                data: filterData || undefined,
+                total: filterTotal || undefined
+            },
+            totalGeral: filteredTotal
+        });
+    };
 
     if (loading) {
         return (
@@ -422,43 +474,54 @@ export const ValeMercadoria = ({ permissions }: { permissions: any }) => {
                             />
                         </div>
 
-                        {/* Filtro de Mês/Ano */}
-                        <div className="flex items-center gap-2 bg-[#151B2D] border border-cyan-500/10 rounded-lg px-3 py-1.5 transition-all hover:border-cyan-500/30">
-                            <CalendarIcon className="w-4 h-4 text-cyan-400" />
-                            <div className="flex items-center gap-2">
-                                <select
-                                    value={selectedMonth}
-                                    onChange={(e) => setSelectedMonth(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                                    className="bg-transparent text-xs text-gray-300 focus:outline-none cursor-pointer appearance-none pr-1"
-                                >
-                                    <option value="all" className="bg-[#0F1629]">Mês: Todos</option>
-                                    {Array.from({ length: 12 }, (_, i) => (
-                                        <option key={i + 1} value={i + 1} className="bg-[#0F1629]">
-                                            {new Date(2000, i).toLocaleDateString('pt-BR', { month: 'long' })}
-                                        </option>
-                                    ))}
-                                </select>
-                                <span className="text-gray-600 font-bold">/</span>
-                                <select
-                                    value={selectedYear}
-                                    onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                                    className="bg-transparent text-xs text-gray-300 focus:outline-none cursor-pointer appearance-none"
-                                >
-                                    <option value="all" className="bg-[#0F1629]">Ano: Todos</option>
-                                    {[2024, 2025, 2026, 2027].map(y => (
-                                        <option key={y} value={y} className="bg-[#0F1629]">{y}</option>
-                                    ))}
-                                </select>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={handleExportPDF}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-[#151B2D] border border-cyan-500/10 hover:border-cyan-500/30 text-gray-300 hover:text-white text-xs font-bold rounded-lg transition-all"
+                                title="Exportar PDF"
+                            >
+                                <FileText className="w-4 h-4 text-cyan-400" />
+                                <span className="hidden sm:inline">Exportar PDF</span>
+                            </button>
+
+                            {/* Filtro de Mês/Ano */}
+                            <div className="flex items-center gap-2 bg-[#151B2D] border border-cyan-500/10 rounded-lg px-3 py-1.5 transition-all hover:border-cyan-500/30">
+                                <CalendarIcon className="w-4 h-4 text-cyan-400" />
+                                <div className="flex items-center gap-2">
+                                    <select
+                                        value={selectedMonth}
+                                        onChange={(e) => setSelectedMonth(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                                        className="bg-transparent text-xs text-gray-300 focus:outline-none cursor-pointer appearance-none pr-1"
+                                    >
+                                        <option value="all" className="bg-[#0F1629]">Mês: Todos</option>
+                                        {Array.from({ length: 12 }, (_, i) => (
+                                            <option key={i + 1} value={i + 1} className="bg-[#0F1629]">
+                                                {new Date(2000, i).toLocaleDateString('pt-BR', { month: 'long' })}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <span className="text-gray-600 font-bold">/</span>
+                                    <select
+                                        value={selectedYear}
+                                        onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                                        className="bg-transparent text-xs text-gray-300 focus:outline-none cursor-pointer appearance-none"
+                                    >
+                                        <option value="all" className="bg-[#0F1629]">Ano: Todos</option>
+                                        {[2024, 2025, 2026, 2027].map(y => (
+                                            <option key={y} value={y} className="bg-[#0F1629]">{y}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                {(selectedMonth !== 'all' || selectedYear !== 'all') && (
+                                    <button
+                                        onClick={() => { setSelectedMonth('all'); setSelectedYear('all'); }}
+                                        className="ml-1 p-0.5 hover:bg-gray-700 rounded-full text-gray-500 transition-colors"
+                                        title="Limpar Filtros"
+                                    >
+                                        <CloseIcon className="w-3 h-3" />
+                                    </button>
+                                )}
                             </div>
-                            {(selectedMonth !== 'all' || selectedYear !== 'all') && (
-                                <button
-                                    onClick={() => { setSelectedMonth('all'); setSelectedYear('all'); }}
-                                    className="ml-1 p-0.5 hover:bg-gray-700 rounded-full text-gray-500 transition-colors"
-                                    title="Limpar Filtros"
-                                >
-                                    <CloseIcon className="w-3 h-3" />
-                                </button>
-                            )}
                         </div>
                     </div>
                 </div>
@@ -466,17 +529,113 @@ export const ValeMercadoria = ({ permissions }: { permissions: any }) => {
                     <table className="w-full">
                         <thead>
                             <tr className="text-left bg-cyan-500/5">
-                                <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider">Funcionário</th>
-                                <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider">Data</th>
-                                <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider">Total</th>
+                                <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider relative">
+                                    <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setOpenFilter(openFilter === 'filial' ? null : 'filial')}>
+                                        Funcionário / Filial
+                                        <Filter className={`w-3 h-3 transition-colors ${(openFilter === 'filial' || filterFilial !== 'all') ? 'text-yellow-400' : 'text-cyan-500/50 hover:text-cyan-400'}`} />
+                                    </div>
+                                    {openFilter === 'filial' && (
+                                        <div ref={filterRef} className="absolute z-[100] top-full left-0 mt-1 p-2 bg-[#151B2D] border border-cyan-500/20 rounded-lg shadow-2xl min-w-[150px]">
+                                            <div className="flex items-center justify-between mb-1 px-1">
+                                                <span className="text-[9px] text-gray-400 uppercase font-bold">Filial</span>
+                                                <button onClick={() => setOpenFilter(null)}><CloseIcon className="w-3 h-3 text-gray-500 hover:text-white" /></button>
+                                            </div>
+                                            <div className="space-y-0.5 max-h-48 overflow-y-auto custom-scrollbar">
+                                                <button
+                                                    onClick={() => { setFilterFilial('all'); setOpenFilter(null); }}
+                                                    className={`w-full text-left px-2 py-1 rounded text-xs transition-colors ${filterFilial === 'all' ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-400 hover:bg-white/5'}`}
+                                                >
+                                                    Todas
+                                                </button>
+                                                {filiais.map(f => (
+                                                    <button
+                                                        key={f.id}
+                                                        onClick={() => { setFilterFilial(f.nome); setOpenFilter(null); }}
+                                                        className={`w-full text-left px-2 py-1 rounded text-xs transition-colors ${filterFilial === f.nome ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-400 hover:bg-white/5'}`}
+                                                    >
+                                                        {f.nome}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </th>
+                                <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider relative">
+                                    <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setOpenFilter(openFilter === 'data' ? null : 'data')}>
+                                        Data
+                                        <Filter className={`w-3 h-3 transition-colors ${(openFilter === 'data' || filterData !== '') ? 'text-yellow-400' : 'text-cyan-500/50 hover:text-cyan-400'}`} />
+                                    </div>
+                                    {openFilter === 'data' && (
+                                        <div ref={filterRef} className="absolute z-[100] top-full left-0 mt-1 p-2 bg-[#151B2D] border border-cyan-500/20 rounded-lg shadow-2xl min-w-[120px]">
+                                            <div className="flex items-center justify-between mb-1 px-1">
+                                                <span className="text-[9px] text-gray-400 uppercase font-bold">Data</span>
+                                                <button onClick={() => setOpenFilter(null)}><CloseIcon className="w-3 h-3 text-gray-500 hover:text-white" /></button>
+                                            </div>
+                                            <input
+                                                type="text"
+                                                placeholder="..."
+                                                value={filterData}
+                                                onChange={(e) => setFilterData(e.target.value)}
+                                                className="w-full bg-[#0F1629] border border-cyan-500/10 rounded px-2 py-1.5 text-xs text-gray-200 focus:ring-1 focus:ring-cyan-500 focus:outline-none"
+                                                autoFocus
+                                            />
+                                        </div>
+                                    )}
+                                </th>
+                                <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider relative">
+                                    <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setOpenFilter(openFilter === 'total' ? null : 'total')}>
+                                        Total
+                                        <Filter className={`w-3 h-3 transition-colors ${(openFilter === 'total' || filterTotal !== '') ? 'text-yellow-400' : 'text-cyan-500/50 hover:text-cyan-400'}`} />
+                                    </div>
+                                    {openFilter === 'total' && (
+                                        <div ref={filterRef} className="absolute z-[100] top-full left-0 mt-1 p-2 bg-[#151B2D] border border-cyan-500/20 rounded-lg shadow-2xl min-w-[120px]">
+                                            <div className="flex items-center justify-between mb-1 px-1">
+                                                <span className="text-[9px] text-gray-400 uppercase font-bold">Valor</span>
+                                                <button onClick={() => setOpenFilter(null)}><CloseIcon className="w-3 h-3 text-gray-500 hover:text-white" /></button>
+                                            </div>
+                                            <input
+                                                type="text"
+                                                placeholder="..."
+                                                value={filterTotal}
+                                                onChange={(e) => setFilterTotal(e.target.value)}
+                                                className="w-full bg-[#0F1629] border border-cyan-500/10 rounded px-2 py-1.5 text-xs text-gray-200 focus:ring-1 focus:ring-cyan-500 focus:outline-none"
+                                                autoFocus
+                                            />
+                                        </div>
+                                    )}
+                                </th>
                                 <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider">Parcelas</th>
-                                <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider">Status</th>
+                                <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider relative">
+                                    <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setOpenFilter(openFilter === 'status' ? null : 'status')}>
+                                        Status
+                                        <Filter className={`w-3 h-3 transition-colors ${(openFilter === 'status' || filterStatus !== 'all') ? 'text-yellow-400' : 'text-cyan-500/50 hover:text-cyan-400'}`} />
+                                    </div>
+                                    {openFilter === 'status' && (
+                                        <div ref={filterRef} className="absolute z-[100] top-full left-0 mt-1 p-2 bg-[#151B2D] border border-cyan-500/20 rounded-lg shadow-2xl min-w-[120px]">
+                                            <div className="flex items-center justify-between mb-1 px-1">
+                                                <span className="text-[9px] text-gray-400 uppercase font-bold">Status</span>
+                                                <button onClick={() => setOpenFilter(null)}><CloseIcon className="w-3 h-3 text-gray-500 hover:text-white" /></button>
+                                            </div>
+                                            <div className="space-y-0.5">
+                                                {['all', 'ativo', 'quitado', 'cancelado'].map(s => (
+                                                    <button
+                                                        key={s}
+                                                        onClick={() => { setFilterStatus(s); setOpenFilter(null); }}
+                                                        className={`w-full text-left px-2 py-1 rounded text-xs transition-colors capitalize ${filterStatus === s ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-400 hover:bg-white/5'}`}
+                                                    >
+                                                        {s === 'all' ? 'Todos' : s}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </th>
                                 <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider">Ações</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-cyan-500/5">
                             {filteredVales.length > 0 ? (
-                                filteredVales.map(vale => (
+                                filteredVales.map((vale: ValeMercadoriaData) => (
                                     <tr key={vale.id} className="hover:bg-white/5 transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col">
@@ -522,6 +681,19 @@ export const ValeMercadoria = ({ permissions }: { permissions: any }) => {
                                 </tr>
                             )}
                         </tbody>
+                        {filteredVales.length > 0 && (
+                            <tfoot className="bg-cyan-500/5 border-t border-cyan-500/20">
+                                <tr>
+                                    <td colSpan={2} className="px-6 py-4 text-xs font-bold text-gray-500 text-right uppercase tracking-wider">
+                                        Total Geral:
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-cyan-400 font-black text-base">
+                                        R$ {filteredTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </td>
+                                    <td colSpan={3}></td>
+                                </tr>
+                            </tfoot>
+                        )}
                     </table>
                 </div>
             </Card>

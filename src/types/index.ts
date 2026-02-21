@@ -241,3 +241,14 @@ export interface CandidatoAnexo {
   tipo_arquivo: 'curriculo' | 'portfolio' | 'outro';
   created_at: string;
 }
+
+export interface FilialMetaMensal {
+  id: string;
+  filial_id: string;
+  mes: number;
+  ano: number;
+  meta: number;
+  faturado: number;
+  created_at: string;
+  updated_at: string;
+}

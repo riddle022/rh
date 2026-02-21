@@ -58,7 +58,7 @@ function AppContent() {
       case 'cargos':
         return <Cargos permissions={viewPerms} />;
       case 'funcionarios':
-        return <Funcionarios onViewChange={setCurrentView} permissions={viewPerms} />;
+        return <Funcionarios permissions={viewPerms} />;
       case 'metas':
         return <div className="text-white p-8">Visualização de Metas (Em breve)</div>;
       case 'comissoes':

@@ -1,4 +1,4 @@
-import { Plus, Edit2, Trash2, Users, Loader2, Search, Calendar, DollarSign, Clock, FileText, Building2, Network } from 'lucide-react';
+import { Plus, Edit2, Trash2, Users, Loader2, Search, Calendar, FileText, Building2 } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNotification } from '../context/NotificationContext';
@@ -6,14 +6,12 @@ import { Card } from '../components/ui/Card';
 import { Modal } from '../components/ui/Modal';
 import type { Funcionario, Filial, Setor, Departamento, Cargo } from '../types';
 
-export const Funcionarios = ({ onViewChange, permissions }: { onViewChange: (view: string) => void, permissions: any }) => {
+export const Funcionarios = ({ permissions }: { permissions: any }) => {
     const { showToast, confirm: confirmAction } = useNotification();
     const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
     const [filiais, setFiliais] = useState<Filial[]>([]);
-    const [setores, setSetores] = useState<Setor[]>([]);
     const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
     const [cargos, setCargos] = useState<Cargo[]>([]);
-    const [filteredSetores, setFilteredSetores] = useState<Setor[]>([]);
     const [filteredCargos, setFilteredCargos] = useState<Cargo[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -22,13 +20,12 @@ export const Funcionarios = ({ onViewChange, permissions }: { onViewChange: (vie
     const [filterFilial, setFilterFilial] = useState('');
     const [filterDepartamento, setFilterDepartamento] = useState('');
     const [filterCargo, setFilterCargo] = useState('');
-    const [activeTab, setActiveTab] = useState<'geral' | 'financeiro' | 'ocorrencias'>('geral');
+    const [activeTab, setActiveTab] = useState<'geral' | 'ocorrencias'>('geral');
 
     const [formData, setFormData] = useState({
         nome: '',
         email: '',
         filial_id: '',
-        setor_id: '',
         departamento_id: '',
         cargo_id: '',
         salario_base: 0,
@@ -46,7 +43,6 @@ export const Funcionarios = ({ onViewChange, permissions }: { onViewChange: (vie
         contato_emergencia_telefone: '',
         plano_saude: false,
         ativo: true,
-        horas_extras_registro: '',
         ocorrencias: '',
         ferias_inicio: '',
         ferias_fim: '',
@@ -56,14 +52,6 @@ export const Funcionarios = ({ onViewChange, permissions }: { onViewChange: (vie
         fetchData();
     }, []);
 
-    useEffect(() => {
-        if (formData.filial_id) {
-            const filtered = setores.filter(s => s.filial_id === formData.filial_id && s.tipo === 'vendas');
-            setFilteredSetores(filtered);
-        } else {
-            setFilteredSetores([]);
-        }
-    }, [formData.filial_id, setores]);
 
     useEffect(() => {
         if (formData.departamento_id) {
@@ -89,14 +77,10 @@ export const Funcionarios = ({ onViewChange, permissions }: { onViewChange: (vie
             const [funcionariosRes, filiaisRes, setoresRes, deptsRes, cargosRes] = await Promise.all([
                 supabase
                     .from('funcionarios')
-                    .select('*, filial:filiais(*), setor:setores(*), departamento:departamentos(*), cargo_rel:cargos(*)')
+                    .select('*, filial:filiais(*), departamento:departamentos(*), cargo_rel:cargos(*)')
                     .order('created_at', { ascending: false }),
                 supabase
                     .from('filiais')
-                    .select('*')
-                    .order('nome'),
-                supabase
-                    .from('setores')
                     .select('*')
                     .order('nome'),
                 supabase
@@ -116,7 +100,6 @@ export const Funcionarios = ({ onViewChange, permissions }: { onViewChange: (vie
 
             setFuncionarios(funcionariosRes.data || []);
             setFiliais(filiaisRes.data || []);
-            setSetores(setoresRes.data || []);
             setDepartamentos(deptsRes.data || []);
             setCargos(cargosRes.data || []);
         } catch (error) {
@@ -138,7 +121,7 @@ export const Funcionarios = ({ onViewChange, permissions }: { onViewChange: (vie
         delete payload.vale_mercadoria_status;
 
         // Fields that must be null if empty
-        const uuidFields = ['setor_id', 'departamento_id', 'cargo_id'] as const;
+        const uuidFields = ['departamento_id', 'cargo_id'] as const;
         uuidFields.forEach(field => {
             if (!payload[field]) {
                 payload[field] = null;
@@ -146,7 +129,7 @@ export const Funcionarios = ({ onViewChange, permissions }: { onViewChange: (vie
         });
 
         // Other optional strings
-        const optionalStrings = ['email', 'data_desvinculamento', 'sexo', 'documento', 'cpf', 'pix', 'data_nascimento', 'celular', 'contato_emergencia_nome', 'contato_emergencia_parentesco', 'contato_emergencia_telefone', 'horas_extras_registro', 'ocorrencias', 'ferias_inicio', 'ferias_fim'] as const;
+        const optionalStrings = ['email', 'data_desvinculamento', 'sexo', 'documento', 'cpf', 'pix', 'data_nascimento', 'celular', 'contato_emergencia_nome', 'contato_emergencia_parentesco', 'contato_emergencia_telefone', 'ocorrencias', 'ferias_inicio', 'ferias_fim'] as const;
         optionalStrings.forEach(field => {
             if (!payload[field]) {
                 payload[field] = null;
@@ -206,7 +189,6 @@ export const Funcionarios = ({ onViewChange, permissions }: { onViewChange: (vie
             nome: f.nome,
             email: f.email || '',
             filial_id: f.filial_id,
-            setor_id: f.setor_id || '',
             departamento_id: f.departamento_id || '',
             cargo_id: f.cargo_id || '',
             salario_base: f.salario_base,
@@ -224,7 +206,6 @@ export const Funcionarios = ({ onViewChange, permissions }: { onViewChange: (vie
             contato_emergencia_telefone: f.contato_emergencia_telefone || '',
             plano_saude: f.plano_saude || false,
             ativo: f.ativo,
-            horas_extras_registro: f.horas_extras_registro || '',
             ocorrencias: f.ocorrencias || '',
             ferias_inicio: f.ferias_inicio || '',
             ferias_fim: f.ferias_fim || '',
@@ -240,7 +221,6 @@ export const Funcionarios = ({ onViewChange, permissions }: { onViewChange: (vie
             nome: '',
             email: '',
             filial_id: '',
-            setor_id: '',
             departamento_id: '',
             cargo_id: '',
             salario_base: 0,
@@ -258,7 +238,6 @@ export const Funcionarios = ({ onViewChange, permissions }: { onViewChange: (vie
             contato_emergencia_telefone: '',
             plano_saude: false,
             ativo: true,
-            horas_extras_registro: '',
             ocorrencias: '',
             ferias_inicio: '',
             ferias_fim: '',
@@ -436,12 +415,6 @@ export const Funcionarios = ({ onViewChange, permissions }: { onViewChange: (vie
                         Dados Gerais
                     </button>
                     <button
-                        onClick={() => setActiveTab('financeiro')}
-                        className={`px-4 py-2 font-medium transition-colors border-b-2 ${activeTab === 'financeiro' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-gray-400 hover:text-gray-200'}`}
-                    >
-                        Vales & Extras
-                    </button>
-                    <button
                         onClick={() => setActiveTab('ocorrencias')}
                         className={`px-4 py-2 font-medium transition-colors border-b-2 ${activeTab === 'ocorrencias' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-gray-400 hover:text-gray-200'}`}
                     >
@@ -488,24 +461,12 @@ export const Funcionarios = ({ onViewChange, permissions }: { onViewChange: (vie
                                 <label className="block text-sm font-medium text-gray-300 mb-1">Filial</label>
                                 <select
                                     value={formData.filial_id}
-                                    onChange={(e) => setFormData({ ...formData, filial_id: e.target.value, setor_id: '' })}
+                                    onChange={(e) => setFormData({ ...formData, filial_id: e.target.value })}
                                     className="w-full px-4 py-2 bg-[#151B2D] border border-gray-700 rounded-lg text-gray-200 focus:ring-2 focus:ring-cyan-500"
                                     required
                                 >
                                     <option value="">Selecione...</option>
                                     {filiais.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-1">Setor (Vendas)</label>
-                                <select
-                                    value={formData.setor_id}
-                                    onChange={(e) => setFormData({ ...formData, setor_id: e.target.value })}
-                                    className="w-full px-4 py-2 bg-[#151B2D] border border-gray-700 rounded-lg text-gray-200 focus:ring-2 focus:ring-cyan-500"
-                                    disabled={!formData.filial_id}
-                                >
-                                    <option value="">Nenhum (Operacional)</option>
-                                    {filteredSetores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
                                 </select>
                             </div>
                             <div>
@@ -686,40 +647,9 @@ export const Funcionarios = ({ onViewChange, permissions }: { onViewChange: (vie
                                 />
                                 <label htmlFor="ativo" className="text-sm font-medium text-gray-300">Funcionário Ativo</label>
                             </div>
-                        </div>
-                    )}
 
-                    {activeTab === 'financeiro' && (
-                        <div className="space-y-6">
-                            <div className="p-4 bg-cyan-500/5 rounded-lg border border-cyan-500/10">
-                                <h4 className="text-cyan-400 font-semibold mb-1 flex items-center gap-2">
-                                    <DollarSign className="w-4 h-4" /> Vales & Financeiro
-                                </h4>
-                                <p className="text-gray-400 text-sm">
-                                    Para gerenciar os Vales Mercadoria deste funcionário, utilize a tela específica de
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            handleCloseModal();
-                                            onViewChange('vale-mercadoria');
-                                        }}
-                                        className="text-cyan-400 hover:text-cyan-300 underline ml-1"
-                                    >
-                                        Gestão de Vales
-                                    </button>.
-                                </p>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
-                                    <Clock className="w-4 h-4" /> Registro de Horas Extras
-                                </label>
-                                <textarea
-                                    value={formData.horas_extras_registro}
-                                    onChange={(e) => setFormData({ ...formData, horas_extras_registro: e.target.value })}
-                                    placeholder="Descreva o controle de horas extras acumuladas ou pagas..."
-                                    className="w-full px-4 py-2 bg-[#151B2D] border border-gray-700 rounded-lg text-gray-200 focus:ring-2 focus:ring-cyan-500 h-32 resize-none"
-                                />
+                            <div className="col-span-full border-t border-gray-700 pt-4 mt-2">
+                                <h4 className="text-cyan-400 font-semibold mb-3">Financeiro e Horas</h4>
                             </div>
 
                             <div>
@@ -734,6 +664,7 @@ export const Funcionarios = ({ onViewChange, permissions }: { onViewChange: (vie
                             </div>
                         </div>
                     )}
+
 
                     {activeTab === 'ocorrencias' && (
                         <div className="space-y-6">

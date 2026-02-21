@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
     Loader2,
     Search,
@@ -14,14 +14,16 @@ import {
     Clock,
     Filter,
     X,
-    ChevronDown
+    ChevronDown,
+    FileText
 } from 'lucide-react';
 import { useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNotification } from '../context/NotificationContext';
 import { Card } from '../components/ui/Card';
 import { Modal } from '../components/ui/Modal';
-import type { Funcionario, LancamentoFinanceiro } from '../types';
+import type { Funcionario, LancamentoFinanceiro, Filial } from '../types';
+import { exportLancamentosToPdf } from '../utils/lancamentosPdfExport';
 
 export const Lancamentos = ({ permissions }: { permissions: any }) => {
     const { showToast, confirm: confirmAction } = useNotification();
@@ -30,6 +32,7 @@ export const Lancamentos = ({ permissions }: { permissions: any }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [listSearchTerm, setListSearchTerm] = useState('');
     const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
+    const [filiais, setFiliais] = useState<Filial[]>([]);
     const [lancamentos, setLancamentos] = useState<LancamentoFinanceiro[]>([]);
 
     // Form State
@@ -46,6 +49,7 @@ export const Lancamentos = ({ permissions }: { permissions: any }) => {
     const [selectedMonthFilter, setSelectedMonthFilter] = useState<number | 'all'>(new Date().getMonth() + 1);
     const [selectedYearFilter, setSelectedYearFilter] = useState<number | 'all'>(new Date().getFullYear());
     const [filterTipo, setFilterTipo] = useState<string>('all');
+    const [filterFilial, setFilterFilial] = useState<string>('all');
     const [filterReferencia, setFilterReferencia] = useState<string>('');
     const [filterData, setFilterData] = useState<string>('');
     const [openFilter, setOpenFilter] = useState<string | null>(null);
@@ -76,10 +80,16 @@ export const Lancamentos = ({ permissions }: { permissions: any }) => {
 
             const { data: lancData } = await supabase
                 .from('lancamentos_financeiros')
-                .select('*, funcionario:funcionarios(*)')
+                .select('*, funcionario:funcionarios(*, filial:filiais(*))')
                 .order('data_lancamento', { ascending: false });
 
+            const { data: filialData } = await supabase
+                .from('filiais')
+                .select('*')
+                .order('nome');
+
             setFuncionarios(funcData || []);
+            setFiliais(filialData || []);
             setLancamentos(lancData || []);
         } catch (error) {
             console.error('Error fetching data:', error);
@@ -186,24 +196,46 @@ export const Lancamentos = ({ permissions }: { permissions: any }) => {
         f.nome.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const filteredLancamentos = lancamentos.filter(lanc => {
-        const matchesSearch = lanc.funcionario?.nome.toLowerCase().includes(listSearchTerm.toLowerCase());
-        const matchesMonth = selectedMonthFilter === 'all' || lanc.mes === selectedMonthFilter;
-        const matchesYear = selectedYearFilter === 'all' || lanc.ano === selectedYearFilter;
-        const matchesTipo = filterTipo === 'all' || lanc.tipo === filterTipo;
-        const refStr = `${String(lanc.mes).padStart(2, '0')}/${lanc.ano}`;
-        const matchesRef = !filterReferencia || refStr.includes(filterReferencia);
-        const dataStr = lanc.data_lancamento.split('-').reverse().join('/');
-        const matchesData = !filterData || dataStr.includes(filterData);
+    const filteredLancamentos = useMemo(() => {
+        return lancamentos.filter(lanc => {
+            const matchesSearch = (lanc.funcionario?.nome || '').toLowerCase().includes(listSearchTerm.toLowerCase());
+            const matchesFilial = filterFilial === 'all' || lanc.funcionario?.filial?.nome === filterFilial;
+            const matchesMonth = selectedMonthFilter === 'all' || lanc.mes === selectedMonthFilter;
+            const matchesYear = selectedYearFilter === 'all' || lanc.ano === selectedYearFilter;
+            const matchesTipo = filterTipo === 'all' || lanc.tipo === filterTipo;
+            const refStr = `${String(lanc.mes).padStart(2, '0')}/${lanc.ano}`;
+            const matchesRef = !filterReferencia || refStr.includes(filterReferencia);
+            const dataStr = (lanc.data_lancamento || '').split('-').reverse().join('/');
+            const matchesData = !filterData || dataStr.includes(filterData);
 
-        return matchesSearch && matchesMonth && matchesYear && matchesTipo && matchesRef && matchesData;
-    });
+            return matchesSearch && matchesFilial && matchesMonth && matchesYear && matchesTipo && matchesRef && matchesData;
+        });
+    }, [lancamentos, listSearchTerm, filterFilial, selectedMonthFilter, selectedYearFilter, filterTipo, filterReferencia, filterData]);
 
-    const totals = {
-        Comissao: lancamentos.filter(l => l.tipo === 'Comissao').reduce((acc, l) => acc + l.valor, 0),
-        Bonificacao: lancamentos.filter(l => l.tipo === 'Bonificacao').reduce((acc, l) => acc + l.valor, 0),
-        HorasExtras: lancamentos.filter(l => l.tipo === 'Horas extras').reduce((acc, l) => acc + l.valor, 0)
+    const filteredTotals = useMemo(() => ({
+        Comissao: filteredLancamentos.filter(l => l.tipo === 'Comissao').reduce((acc, l) => acc + l.valor, 0),
+        Bonificacao: filteredLancamentos.filter(l => l.tipo === 'Bonificacao').reduce((acc, l) => acc + l.valor, 0),
+        HorasExtras: filteredLancamentos.filter(l => l.tipo === 'Horas extras').reduce((acc, l) => acc + l.valor, 0),
+        Geral: filteredLancamentos.reduce((acc, l) => acc + l.valor, 0)
+    }), [filteredLancamentos]);
+
+    const handleExportPDF = () => {
+        exportLancamentosToPdf({
+            lancamentos: filteredLancamentos,
+            periodo: {
+                mes: selectedMonthFilter,
+                ano: selectedYearFilter
+            },
+            filtros: {
+                tipo: filterTipo,
+                funcionario: listSearchTerm || undefined,
+                filial: filterFilial || undefined
+            },
+            totals: filteredTotals
+        });
     };
+
+    const totals = filteredTotals;
 
     if (loading && lancamentos.length === 0) {
         return (
@@ -316,6 +348,16 @@ export const Lancamentos = ({ permissions }: { permissions: any }) => {
                                 ))}
                             </select>
                         </div>
+
+                        <button
+                            onClick={handleExportPDF}
+                            disabled={filteredLancamentos.length === 0}
+                            className="flex items-center gap-2 px-4 py-2 bg-[#151B2D] hover:bg-cyan-500/10 text-gray-400 hover:text-cyan-400 border border-cyan-500/10 rounded-lg text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+                            title="Exportar PDF"
+                        >
+                            <FileText className="w-4 h-4 transition-transform group-hover:scale-110" />
+                            <span className="hidden sm:inline">Exportar PDF</span>
+                        </button>
                     </div>
                 </div>
 
@@ -326,7 +368,7 @@ export const Lancamentos = ({ permissions }: { permissions: any }) => {
                                 <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider relative">
                                     <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setOpenFilter(openFilter === 'funcionario' ? null : 'funcionario')}>
                                         Funcionário
-                                        <Filter className={`w-3 h-3 transition-colors ${openFilter === 'funcionario' ? 'text-cyan-400' : 'text-cyan-500/50 cursor-pointer hover:text-cyan-400'}`} />
+                                        <Filter className={`w-3 h-3 transition-colors ${(openFilter === 'funcionario' || listSearchTerm !== '') ? 'text-yellow-400' : 'text-cyan-500/50 cursor-pointer hover:text-cyan-400'}`} />
                                     </div>
                                     {openFilter === 'funcionario' && (
                                         <div ref={filterRef} className="absolute z-[100] top-full left-0 mt-1 p-2 bg-[#151B2D] border border-cyan-500/20 rounded-lg shadow-2xl min-w-[180px]">
@@ -346,9 +388,40 @@ export const Lancamentos = ({ permissions }: { permissions: any }) => {
                                     )}
                                 </th>
                                 <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider relative">
+                                    <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setOpenFilter(openFilter === 'filial' ? null : 'filial')}>
+                                        Filial
+                                        <Filter className={`w-3 h-3 transition-colors ${(openFilter === 'filial' || filterFilial !== 'all') ? 'text-yellow-400' : 'text-cyan-500/50 cursor-pointer hover:text-cyan-400'}`} />
+                                    </div>
+                                    {openFilter === 'filial' && (
+                                        <div ref={filterRef} className="absolute z-[100] top-full left-0 mt-1 p-2 bg-[#151B2D] border border-cyan-500/20 rounded-lg shadow-2xl min-w-[150px]">
+                                            <div className="flex items-center justify-between mb-1 px-1">
+                                                <span className="text-[9px] text-gray-400 uppercase font-bold">Filial</span>
+                                                <button onClick={() => setOpenFilter(null)}><X className="w-3 h-3 text-gray-500 hover:text-white" /></button>
+                                            </div>
+                                            <div className="space-y-0.5 max-h-48 overflow-y-auto custom-scrollbar">
+                                                <button
+                                                    onClick={() => { setFilterFilial('all'); setOpenFilter(null); }}
+                                                    className={`w-full text-left px-2 py-1 rounded text-xs transition-colors ${filterFilial === 'all' ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-400 hover:bg-white/5'}`}
+                                                >
+                                                    Todas
+                                                </button>
+                                                {filiais.map(f => (
+                                                    <button
+                                                        key={f.id}
+                                                        onClick={() => { setFilterFilial(f.nome); setOpenFilter(null); }}
+                                                        className={`w-full text-left px-2 py-1 rounded text-xs transition-colors ${filterFilial === f.nome ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-400 hover:bg-white/5'}`}
+                                                    >
+                                                        {f.nome}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </th>
+                                <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider relative">
                                     <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setOpenFilter(openFilter === 'tipo' ? null : 'tipo')}>
                                         Tipo
-                                        <Filter className={`w-3 h-3 transition-colors ${openFilter === 'tipo' ? 'text-cyan-400' : 'text-cyan-500/50 cursor-pointer hover:text-cyan-400'}`} />
+                                        <Filter className={`w-3 h-3 transition-colors ${(openFilter === 'tipo' || filterTipo !== 'all') ? 'text-yellow-400' : 'text-cyan-500/50 cursor-pointer hover:text-cyan-400'}`} />
                                     </div>
                                     {openFilter === 'tipo' && (
                                         <div ref={filterRef} className="absolute z-[100] top-full left-0 mt-1 p-2 bg-[#151B2D] border border-cyan-500/20 rounded-lg shadow-2xl min-w-[140px]">
@@ -423,10 +496,10 @@ export const Lancamentos = ({ permissions }: { permissions: any }) => {
                                 filteredLancamentos.map(lanc => (
                                     <tr key={lanc.id} className="hover:bg-white/5 transition-colors">
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="flex flex-col">
-                                                <span className="text-gray-200 font-medium">{lanc.funcionario?.nome}</span>
-                                                <span className="text-[10px] text-gray-500 uppercase">{lanc.funcionario?.filial?.nome}</span>
-                                            </div>
+                                            <span className="text-gray-200 font-medium">{lanc.funcionario?.nome}</span>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <span className="text-gray-400 text-sm">{lanc.funcionario?.filial?.nome || 'N/A'}</span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${lanc.tipo === 'Comissao' ? 'bg-green-500/20 text-green-400' :
@@ -467,15 +540,28 @@ export const Lancamentos = ({ permissions }: { permissions: any }) => {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                                         Nenhum lançamento encontrado.
                                     </td>
                                 </tr>
                             )}
                         </tbody>
+                        {filteredLancamentos.length > 0 && (
+                            <tfoot className="bg-cyan-500/5 border-t border-cyan-500/20">
+                                <tr>
+                                    <td colSpan={4} className="px-6 py-4 text-xs font-bold text-gray-500 text-right uppercase tracking-wider">
+                                        Total Geral:
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-cyan-400 font-black text-base">
+                                        R$ {filteredTotals.Geral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </td>
+                                    <td colSpan={2}></td>
+                                </tr>
+                            </tfoot>
+                        )}
                     </table>
                 </div>
-            </Card>
+            </Card >
 
             <Modal
                 isOpen={isModalOpen}
@@ -633,6 +719,6 @@ export const Lancamentos = ({ permissions }: { permissions: any }) => {
                     </div>
                 </form>
             </Modal>
-        </div>
+        </div >
     );
 };
