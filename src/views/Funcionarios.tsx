@@ -1,10 +1,11 @@
-import { Plus, Edit2, Trash2, Users, Loader2, Search, Calendar, FileText, Building2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Users, Loader2, Search, Calendar, FileText, Building2, Eye, FileDown } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNotification } from '../context/NotificationContext';
 import { Card } from '../components/ui/Card';
 import { Modal } from '../components/ui/Modal';
 import type { Funcionario, Filial, Setor, Departamento, Cargo } from '../types';
+import { exportFuncionariosToPdf } from '../utils/funcionariosPdfExport';
 
 export const Funcionarios = ({ permissions }: { permissions: any }) => {
     const { showToast, confirm: confirmAction } = useNotification();
@@ -74,7 +75,7 @@ export const Funcionarios = ({ permissions }: { permissions: any }) => {
 
     const fetchData = async () => {
         try {
-            const [funcionariosRes, filiaisRes, setoresRes, deptsRes, cargosRes] = await Promise.all([
+            const [funcionariosRes, filiaisRes, deptsRes, cargosRes] = await Promise.all([
                 supabase
                     .from('funcionarios')
                     .select('*, filial:filiais(*), departamento:departamentos(*), cargo_rel:cargos(*)')
@@ -252,6 +253,18 @@ export const Funcionarios = ({ permissions }: { permissions: any }) => {
         return matchesSearch && matchesFilial && matchesDepto && matchesCargo;
     });
 
+    const handleExportPDF = () => {
+        exportFuncionariosToPdf({
+            funcionarios: filteredFuncionarios,
+            filtros: {
+                nome: searchTerm || undefined,
+                filial: filterFilial ? filiais.find(f => f.id === filterFilial)?.nome : undefined,
+                departamento: filterDepartamento ? departamentos.find(d => d.id === filterDepartamento)?.nome : undefined,
+                cargo: filterCargo ? cargos.find(c => c.id === filterCargo)?.nome : undefined
+            }
+        });
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -266,15 +279,25 @@ export const Funcionarios = ({ permissions }: { permissions: any }) => {
                 <div>
                     <h1 className="text-3xl font-bold text-cyan-400">Funcionários</h1>
                 </div>
-                {permissions?.editar && (
+                <div className="flex items-center gap-3">
                     <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-400 hover:to-cyan-500 text-white font-bold rounded-xl shadow-lg shadow-cyan-500/30 transition-all"
+                        onClick={handleExportPDF}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-[#151B2D] border border-red-500/10 hover:border-red-500/30 text-gray-300 hover:text-red-500 text-xs font-bold rounded-xl transition-all shadow-lg"
+                        title="Exportar PDF"
                     >
-                        <Plus className="w-5 h-5" />
-                        Novo Funcionário
+                        <FileDown className="w-5 h-5 text-red-500" />
+                        <span className="hidden sm:inline">Exportar PDF</span>
                     </button>
-                )}
+                    {permissions?.editar && (
+                        <button
+                            onClick={() => setIsModalOpen(true)}
+                            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-400 hover:to-cyan-500 text-white font-bold rounded-xl shadow-lg shadow-cyan-500/30 transition-all"
+                        >
+                            <Plus className="w-5 h-5" />
+                            Novo Funcionário
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -309,7 +332,7 @@ export const Funcionarios = ({ permissions }: { permissions: any }) => {
                     onChange={(e) => setFilterCargo(e.target.value)}
                     className="w-full px-4 py-2.5 bg-[#0F1629] border border-cyan-500/20 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                 >
-                    <option value="">Todos los Cargos</option>
+                    <option value="">Todos os Cargos</option>
                     {filteredCargosForFilter.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
                 </select>
                 <div className="flex items-end">
@@ -377,11 +400,10 @@ export const Funcionarios = ({ permissions }: { permissions: any }) => {
                                             {permissions?.editar && (
                                                 <button
                                                     onClick={() => handleEdit(f)}
-                                                    className="flex items-center gap-1 px-3 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 rounded-lg transition-colors border border-cyan-500/20 text-[10px] font-bold uppercase tracking-tight"
+                                                    className="p-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 rounded-lg transition-colors border border-cyan-500/20"
                                                     title="Ficha Técnica"
                                                 >
-                                                    <Edit2 className="w-3.5 h-3.5" />
-                                                    Ver Ficha
+                                                    <Eye className="w-3.5 h-3.5" />
                                                 </button>
                                             )}
                                             {permissions?.excluir && (

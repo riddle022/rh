@@ -403,15 +403,25 @@ export const ValeMercadoria = ({ permissions }: { permissions: any }) => {
                 <div>
                     <h1 className="text-3xl font-bold text-cyan-400">Vale Mercadoria</h1>
                 </div>
-                {permissions?.editar && (
+                <div className="flex items-center gap-3">
                     <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-400 hover:to-cyan-500 text-white font-bold rounded-xl shadow-lg shadow-cyan-500/30 transition-all"
+                        onClick={handleExportPDF}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-[#151B2D] border border-red-500/10 hover:border-red-500/30 text-gray-300 hover:text-red-500 text-xs font-bold rounded-xl transition-all shadow-lg shadow-red-500/5"
+                        title="Exportar PDF"
                     >
-                        <Plus className="w-5 h-5" />
-                        Novo Vale
+                        <FileText className="w-5 h-5 text-red-500" />
+                        <span className="hidden sm:inline">Exportar PDF</span>
                     </button>
-                )}
+                    {permissions?.editar && (
+                        <button
+                            onClick={() => setIsModalOpen(true)}
+                            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-400 hover:to-cyan-500 text-white font-bold rounded-xl shadow-lg shadow-cyan-500/30 transition-all"
+                        >
+                            <Plus className="w-5 h-5" />
+                            Novo Vale
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -474,54 +484,44 @@ export const ValeMercadoria = ({ permissions }: { permissions: any }) => {
                             />
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={handleExportPDF}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-[#151B2D] border border-cyan-500/10 hover:border-cyan-500/30 text-gray-300 hover:text-white text-xs font-bold rounded-lg transition-all"
-                                title="Exportar PDF"
-                            >
-                                <FileText className="w-4 h-4 text-cyan-400" />
-                                <span className="hidden sm:inline">Exportar PDF</span>
-                            </button>
 
-                            {/* Filtro de Mês/Ano */}
-                            <div className="flex items-center gap-2 bg-[#151B2D] border border-cyan-500/10 rounded-lg px-3 py-1.5 transition-all hover:border-cyan-500/30">
-                                <CalendarIcon className="w-4 h-4 text-cyan-400" />
-                                <div className="flex items-center gap-2">
-                                    <select
-                                        value={selectedMonth}
-                                        onChange={(e) => setSelectedMonth(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                                        className="bg-transparent text-xs text-gray-300 focus:outline-none cursor-pointer appearance-none pr-1"
-                                    >
-                                        <option value="all" className="bg-[#0F1629]">Mês: Todos</option>
-                                        {Array.from({ length: 12 }, (_, i) => (
-                                            <option key={i + 1} value={i + 1} className="bg-[#0F1629]">
-                                                {new Date(2000, i).toLocaleDateString('pt-BR', { month: 'long' })}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <span className="text-gray-600 font-bold">/</span>
-                                    <select
-                                        value={selectedYear}
-                                        onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                                        className="bg-transparent text-xs text-gray-300 focus:outline-none cursor-pointer appearance-none"
-                                    >
-                                        <option value="all" className="bg-[#0F1629]">Ano: Todos</option>
-                                        {[2024, 2025, 2026, 2027].map(y => (
-                                            <option key={y} value={y} className="bg-[#0F1629]">{y}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                {(selectedMonth !== 'all' || selectedYear !== 'all') && (
-                                    <button
-                                        onClick={() => { setSelectedMonth('all'); setSelectedYear('all'); }}
-                                        className="ml-1 p-0.5 hover:bg-gray-700 rounded-full text-gray-500 transition-colors"
-                                        title="Limpar Filtros"
-                                    >
-                                        <CloseIcon className="w-3 h-3" />
-                                    </button>
-                                )}
+                        {/* Filtro de Mês/Ano */}
+                        <div className="flex items-center gap-2 bg-[#151B2D] border border-cyan-500/10 rounded-lg px-3 py-1.5 transition-all hover:border-cyan-500/30">
+                            <CalendarIcon className="w-4 h-4 text-cyan-400" />
+                            <div className="flex items-center gap-2">
+                                <select
+                                    value={selectedMonth}
+                                    onChange={(e) => setSelectedMonth(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                                    className="bg-transparent text-xs text-gray-300 focus:outline-none cursor-pointer appearance-none pr-1"
+                                >
+                                    <option value="all" className="bg-[#0F1629]">Mês: Todos</option>
+                                    {Array.from({ length: 12 }, (_, i) => (
+                                        <option key={i + 1} value={i + 1} className="bg-[#0F1629]">
+                                            {new Date(2000, i).toLocaleDateString('pt-BR', { month: 'long' })}
+                                        </option>
+                                    ))}
+                                </select>
+                                <span className="text-gray-600 font-bold">/</span>
+                                <select
+                                    value={selectedYear}
+                                    onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                                    className="bg-transparent text-xs text-gray-300 focus:outline-none cursor-pointer appearance-none"
+                                >
+                                    <option value="all" className="bg-[#0F1629]">Ano: Todos</option>
+                                    {[2024, 2025, 2026, 2027].map(y => (
+                                        <option key={y} value={y} className="bg-[#0F1629]">{y}</option>
+                                    ))}
+                                </select>
                             </div>
+                            {(selectedMonth !== 'all' || selectedYear !== 'all') && (
+                                <button
+                                    onClick={() => { setSelectedMonth('all'); setSelectedYear('all'); }}
+                                    className="ml-1 p-0.5 hover:bg-gray-700 rounded-full text-gray-500 transition-colors"
+                                    title="Limpar Filtros"
+                                >
+                                    <CloseIcon className="w-3 h-3" />
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -696,7 +696,7 @@ export const ValeMercadoria = ({ permissions }: { permissions: any }) => {
                         )}
                     </table>
                 </div>
-            </Card>
+            </Card >
 
             <Modal
                 isOpen={isModalOpen}

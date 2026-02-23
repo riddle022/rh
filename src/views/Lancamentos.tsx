@@ -14,7 +14,6 @@ import {
     Clock,
     Filter,
     X,
-    ChevronDown,
     FileText
 } from 'lucide-react';
 import { useRef } from 'react';
@@ -251,15 +250,26 @@ export const Lancamentos = ({ permissions }: { permissions: any }) => {
                 <div>
                     <h1 className="text-3xl font-bold text-cyan-400">Lançamentos Financeiros</h1>
                 </div>
-                {permissions?.editar && (
+                <div className="flex items-center gap-3">
                     <button
-                        onClick={() => { resetForm(); setIsModalOpen(true); }}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-400 hover:to-cyan-500 text-white font-bold rounded-xl shadow-lg shadow-cyan-500/30 transition-all"
+                        onClick={handleExportPDF}
+                        disabled={filteredLancamentos.length === 0}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-[#151B2D] border border-red-500/10 hover:border-red-500/30 text-gray-300 hover:text-red-500 text-xs font-bold rounded-xl transition-all shadow-lg shadow-red-500/5 disabled:opacity-50"
+                        title="Exportar PDF"
                     >
-                        <Plus className="w-5 h-5" />
-                        Novo Lançamento
+                        <FileText className="w-5 h-5 text-red-500" />
+                        <span className="hidden sm:inline">Exportar PDF</span>
                     </button>
-                )}
+                    {permissions?.editar && (
+                        <button
+                            onClick={() => { resetForm(); setIsModalOpen(true); }}
+                            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-400 hover:to-cyan-500 text-white font-bold rounded-xl shadow-lg shadow-cyan-500/30 transition-all"
+                        >
+                            <Plus className="w-5 h-5" />
+                            Novo Lançamento
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -349,15 +359,6 @@ export const Lancamentos = ({ permissions }: { permissions: any }) => {
                             </select>
                         </div>
 
-                        <button
-                            onClick={handleExportPDF}
-                            disabled={filteredLancamentos.length === 0}
-                            className="flex items-center gap-2 px-4 py-2 bg-[#151B2D] hover:bg-cyan-500/10 text-gray-400 hover:text-cyan-400 border border-cyan-500/10 rounded-lg text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
-                            title="Exportar PDF"
-                        >
-                            <FileText className="w-4 h-4 transition-transform group-hover:scale-110" />
-                            <span className="hidden sm:inline">Exportar PDF</span>
-                        </button>
                     </div>
                 </div>
 

@@ -568,10 +568,11 @@ export const Escalas = ({ permissions }: { permissions: any }) => {
                                         filialNome: filiais.find(f => f.id === selectedGroup?.filial_id)?.nome || '',
                                         grupoNome: selectedGroup?.nome || ''
                                     })}
-                                    className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold rounded-lg shadow-lg shadow-cyan-500/30 transition-all"
+                                    className="flex items-center gap-2 px-4 py-2.5 bg-[#151B2D] border border-red-500/10 hover:border-red-500/30 text-gray-300 hover:text-red-500 text-xs font-bold rounded-xl transition-all shadow-lg shadow-red-500/5 group"
+                                    title="Exportar PDF"
                                 >
-                                    <FileText className="w-5 h-5" />
-                                    Exportar PDF
+                                    <FileText className="w-5 h-5 text-red-500 transition-transform group-hover:scale-110" />
+                                    <span className="hidden sm:inline">Exportar PDF</span>
                                 </button>
                             )}
                         </div>
