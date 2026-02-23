@@ -40,31 +40,18 @@ const MENU_STRUCTURE = [
     ]
   },
   {
-    id: 'vendas',
-    label: 'Gerenciador de Vendas',
-    items: [
-      { id: 'vendedores', label: 'Vendedores' },
-      { id: 'setores', label: 'Setores' },
-      { id: 'carregar-vendas', label: 'Carregar Vendas' },
-      { id: 'metas', label: 'Metas' },
-      { id: 'comissoes', label: 'Comissões' },
-    ]
-  },
-  {
     id: 'financeiro',
     label: 'Financeiro',
     items: [
       { id: 'vale-mercadoria', label: 'Vale Mercadoria' },
-      { id: 'horas-extras', label: 'Horas Extras' },
+      { id: 'lancamentos', label: 'Lançamentos' },
     ]
   },
   {
     id: 'ia',
-    label: 'RH Inteligente (IA)',
+    label: 'Inteligência',
     items: [
-      { id: 'analise-curriculos', label: 'Analisador de CV' },
       { id: 'banco-talentos', label: 'Banco de Talentos' },
-      { id: 'assistente-ia', label: 'Assistente IA' },
     ]
   }
 ];

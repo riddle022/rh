@@ -30,7 +30,7 @@ interface SidebarProps {
 
 export const Sidebar = ({ currentView, onViewChange, isCollapsed = false, onToggleCollapse }: SidebarProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [isEmpresaOpen, setIsEmpresaOpen] = useState(true);
+  const [isEmpresaOpen, setIsEmpresaOpen] = useState(false);
 
   const handleSignOut = async () => {
     try {
@@ -69,9 +69,7 @@ export const Sidebar = ({ currentView, onViewChange, isCollapsed = false, onTogg
   ];
 
   const iaItems = [
-    { id: 'analise-curriculos', label: 'Analisador de CV', icon: Bot },
     { id: 'banco-talentos', label: 'Banco de Talentos', icon: Users },
-    { id: 'assistente-ia', label: 'Assistente IA', icon: Bot },
   ];
 
   const { permissions } = useAuth();
