@@ -29,7 +29,6 @@ export const Dashboard = ({ permissions: _permissions }: { permissions: any }) =
   const [escalaEntries, setEscalaEntries] = useState<EscalaEntrada[]>([]);
   const [filialMetas, setFilialMetas] = useState<FilialMetaMensal[]>([]);
   const [selectedFilial, setSelectedFilial] = useState<string>('all');
-  const [goalsMonth, setGoalsMonth] = useState<number>(new Date().getMonth() + 1);
   const [goalsYear, setGoalsYear] = useState<number>(new Date().getFullYear());
   const [stats, setStats] = useState<DashboardStats>({
     totalAtivos: 0,
@@ -78,12 +77,11 @@ export const Dashboard = ({ permissions: _permissions }: { permissions: any }) =
     }
   };
 
-  const fetchGoalsData = async (month: number, year: number) => {
+  const fetchGoalsData = async (year: number) => {
     try {
       const { data, error } = await supabase
         .from('filial_metas_mensais')
         .select('*')
-        .eq('mes', month)
         .eq('ano', year);
 
       if (error) throw error;
@@ -95,9 +93,9 @@ export const Dashboard = ({ permissions: _permissions }: { permissions: any }) =
 
   useEffect(() => {
     if (!loading) {
-      fetchGoalsData(goalsMonth, goalsYear);
+      fetchGoalsData(goalsYear);
     }
-  }, [goalsMonth, goalsYear, loading]);
+  }, [goalsYear, loading]);
 
   const filteredFuncionarios = selectedFilial === 'all'
     ? funcionarios
@@ -290,124 +288,147 @@ export const Dashboard = ({ permissions: _permissions }: { permissions: any }) =
         </Card>
       </div>
 
-      {/* Goals Chart - Meta vs Faturado */}
-      <Card className="p-6 bg-[#0F1629]/50 border-cyan-500/10">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-green-500/10 rounded-lg flex items-center justify-center">
-              <Target className="w-4 h-4 text-green-400" />
-            </div>
-            <h2 className="text-xl font-bold text-gray-200">Desempenho de Metas por Filial</h2>
+      {/* Goals Section Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-green-500/10 rounded-xl flex items-center justify-center border border-green-500/20">
+            <Target className="w-5 h-5 text-green-400" />
           </div>
-          <div className="flex flex-wrap items-center gap-4">
-            {/* Period Filter */}
-            <div className="flex items-center gap-2 bg-[#151B2D] border border-cyan-500/10 rounded-lg px-3 py-1.5 transition-all hover:border-cyan-500/30">
-              <Calendar className="w-4 h-4 text-cyan-400" />
-              <div className="flex items-center gap-2">
-                <select
-                  value={goalsMonth}
-                  onChange={(e) => setGoalsMonth(Number(e.target.value))}
-                  className="bg-transparent text-xs text-gray-300 focus:outline-none cursor-pointer appearance-none pr-1"
-                >
-                  {Array.from({ length: 12 }, (_, i) => (
-                    <option key={i + 1} value={i + 1} className="bg-[#0F1629]">
-                      {new Date(2000, i).toLocaleDateString('pt-BR', { month: 'long' })}
-                    </option>
-                  ))}
-                </select>
-                <span className="text-gray-600 font-bold">/</span>
-                <select
-                  value={goalsYear}
-                  onChange={(e) => setGoalsYear(Number(e.target.value))}
-                  className="bg-transparent text-xs text-gray-300 focus:outline-none cursor-pointer appearance-none"
-                >
-                  {[2024, 2025, 2026, 2027].map(y => (
-                    <option key={y} value={y} className="bg-[#0F1629]">{y}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="hidden sm:flex items-center gap-4 text-xs font-bold uppercase tracking-wider">
-              <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-cyan-500/30" />
-                <span className="text-gray-400">Meta</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                <span className="text-gray-400">Faturado</span>
-              </div>
-            </div>
+          <div>
+            <h2 className="text-xl font-bold text-gray-100 tracking-tight">Desempenho de Metas Anual</h2>
+            <p className="text-xs text-gray-500 font-medium uppercase tracking-widest">Acompanhamento por Unidade • {goalsYear}</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {filiais.map(filial => {
-            const meta = filialMetas.find(m => m.filial_id === filial.id);
-            if (!meta) return null;
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="hidden sm:flex items-center gap-4 text-[10px] font-bold uppercase tracking-widest bg-black/20 p-2 px-4 rounded-full border border-white/5">
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-sm bg-cyan-500/30 border border-cyan-500/50" />
+              <span className="text-gray-400">Objetivo</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-sm bg-gradient-to-t from-green-600 to-green-400" />
+              <span className="text-gray-400">Faturamento</span>
+            </div>
+          </div>
 
-            const percent = meta.meta > 0 ? (meta.faturado / meta.meta) * 100 : 0;
-            const isAchieved = percent >= 100;
+          <div className="flex items-center gap-2 bg-[#151B2D] border border-cyan-500/10 rounded-xl px-4 py-2 transition-all hover:border-cyan-500/30">
+            <Calendar className="w-4 h-4 text-cyan-400" />
+            <select
+              value={goalsYear}
+              onChange={(e) => setGoalsYear(Number(e.target.value))}
+              className="bg-transparent text-sm font-bold text-gray-200 focus:outline-none cursor-pointer appearance-none"
+            >
+              {[2024, 2025, 2026, 2027].map(y => (
+                <option key={y} value={y} className="bg-[#0F1629]">{y}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
 
-            return (
-              <div key={filial.id} className="space-y-3 p-4 bg-white/5 rounded-2xl border border-white/5 hover:border-cyan-500/20 transition-all group">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-gray-200 group-hover:text-cyan-400 transition-colors uppercase">{filial.nome}</span>
-                  </div>
-                  <div className="text-right">
-                    <p className={`text-lg font-black ${isAchieved ? 'text-green-400' : 'text-cyan-400'}`}>
-                      {percent.toFixed(1)}%
-                    </p>
-                  </div>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {filiais.map(filial => {
+          const filialData = filialMetas.filter(m => m.filial_id === filial.id);
+
+          // Calculate max value for this specific chart to keep scale relative to unit performance
+          const maxVal = Math.max(...Array.from({ length: 12 }, (_, m) => {
+            const d = filialData.filter(meta => meta.mes === m + 1);
+            return Math.max(d.reduce((a, b) => a + b.meta, 0), d.reduce((a, b) => a + b.faturado, 0));
+          })) || 1;
+
+          return (
+            <Card key={filial.id} className="p-5 bg-[#0F1629]/50 border-cyan-500/10 overflow-hidden flex flex-col group">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-col">
+                  <span className="text-sm font-black text-cyan-400 uppercase tracking-tighter group-hover:text-cyan-300 transition-colors">
+                    {filial.nome}
+                  </span>
+                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
+                    Performance Mensal
+                  </span>
+                </div>
+                <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center border border-white/5 opacity-40 group-hover:opacity-100 transition-all">
+                  <TrendingUp className="w-4 h-4 text-cyan-400" />
+                </div>
+              </div>
+
+              <div className="h-[250px] relative mt-2">
+                {/* Horizontal Grid Lines */}
+                <div className="absolute inset-x-0 top-0 bottom-8 flex flex-col justify-between pointer-events-none opacity-20">
+                  {[0, 1, 2, 3].map((_, i) => (
+                    <div key={i} className="w-full border-t border-white/5" />
+                  ))}
                 </div>
 
-                <div className="space-y-4">
-                  {/* Meta Bar */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] font-bold text-gray-500 uppercase">
-                      <span>Meta: R$ {meta.meta.toLocaleString('pt-BR')}</span>
-                      <span>100%</span>
-                    </div>
-                    <div className="relative h-4 bg-gray-800/50 rounded-lg overflow-hidden border border-white/5">
-                      {/* Faturado Progress Overlay */}
-                      <div
-                        className={`absolute inset-y-0 left-0 transition-all duration-1000 ease-out z-10 ${isAchieved ? 'bg-gradient-to-r from-green-600 to-green-400 shadow-[0_0_15px_rgba(34,197,94,0.3)]' : 'bg-gradient-to-r from-cyan-600 to-cyan-400'}`}
-                        style={{ width: `${Math.min(percent, 100)}%` }}
-                      >
-                        <div className="absolute inset-0 bg-white/10 animate-pulse" />
+                <div className="h-full flex items-end justify-between gap-1 pb-8 relative z-10">
+                  {Array.from({ length: 12 }, (_, i) => {
+                    const mes = i + 1;
+                    const mesMetaObj = filialData.find(m => m.mes === mes);
+                    const totalMeta = mesMetaObj?.meta || 0;
+                    const totalFaturado = mesMetaObj?.faturado || 0;
+
+                    const metaHeight = (totalMeta / maxVal) * 100;
+                    const faturadoHeight = (totalFaturado / maxVal) * 100;
+                    const isAchieved = totalFaturado >= totalMeta && totalMeta > 0;
+                    const monthName = new Date(2000, i).toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '').charAt(0);
+
+                    return (
+                      <div key={i} className="flex-1 flex flex-col items-center group/bar relative h-full">
+                        {/* Compact Tooltip */}
+                        <div className="absolute -top-14 left-1/2 -translate-x-1/2 bg-[#1A2235] border border-cyan-500/30 p-2 rounded-lg shadow-2xl opacity-0 group-hover/bar:opacity-100 transition-all pointer-events-none z-50 whitespace-nowrap backdrop-blur-xl scale-90">
+                          <p className="text-[9px] font-black text-cyan-400 uppercase mb-1 border-b border-white/5 pb-1">
+                            {new Date(2000, i).toLocaleDateString('pt-BR', { month: 'long' })}
+                          </p>
+                          <div className="space-y-0.5">
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-[8px] text-gray-500 font-bold">META</span>
+                              <span className="text-[9px] text-gray-200 font-bold">R$ {totalMeta.toLocaleString('pt-BR')}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-[8px] text-gray-500 font-bold">FAT.</span>
+                              <span className={`text-[9px] font-black ${isAchieved ? 'text-green-400' : 'text-cyan-400'}`}>R$ {totalFaturado.toLocaleString('pt-BR')}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="relative w-full h-full flex items-end justify-center gap-0.5 px-0.5">
+                          {/* Meta Bar */}
+                          <div
+                            className="w-1.5 bg-cyan-500/10 border border-cyan-500/20 rounded-t-[2px] transition-all duration-700"
+                            style={{ height: `${metaHeight}%` }}
+                          />
+
+                          {/* Faturado Bar */}
+                          <div
+                            className={`w-1.5 rounded-t-[2px] transition-all duration-1000 delay-100 shadow-sm ${isAchieved ? 'bg-gradient-to-t from-green-600 to-green-400' : 'bg-gradient-to-t from-cyan-600 to-cyan-400'}`}
+                            style={{ height: `${faturadoHeight}%` }}
+                          />
+
+                          {isAchieved && (
+                            <div className="absolute -bottom-0.5 inset-x-1 h-0.5 bg-green-500/30 blur-[2px] rounded-full" />
+                          )}
+                        </div>
+
+                        <span className="absolute -bottom-6 text-[8px] font-black text-gray-600 uppercase group-hover/bar:text-cyan-400 transition-colors">
+                          {monthName}
+                        </span>
                       </div>
-
-                      {/* 100% Indicator line if achieved */}
-                      <div className="absolute right-0 top-0 bottom-0 w-px bg-white/10 z-20" />
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center text-[10px] font-bold">
-                    <div className="flex items-center gap-1.5 p-1 px-2 bg-white/5 rounded-md border border-white/5">
-                      <TrendingUp className={`w-3 h-3 ${isAchieved ? 'text-green-400' : 'text-cyan-400'}`} />
-                      <span className="text-gray-400">Total Faturado:</span>
-                      <span className={isAchieved ? 'text-green-400' : 'text-gray-200'}>R$ {meta.faturado.toLocaleString('pt-BR')}</span>
-                    </div>
-                    {isAchieved && (
-                      <span className="flex items-center gap-1 px-2 py-0.5 bg-green-500/10 text-green-400 rounded-full border border-green-500/20 animate-bounce">
-                        <CheckCircle className="w-3 h-3" />
-                        Meta Batida!
-                      </span>
-                    )}
-                  </div>
+                    );
+                  })}
                 </div>
               </div>
-            );
-          }).filter(Boolean)}
 
-          {filialMetas.length === 0 && (
-            <div className="col-span-2 text-center py-12 text-gray-500 italic bg-white/5 rounded-2xl border border-dashed border-white/10">
-              Nenhuma meta definida para o mês atual.
-            </div>
-          )}
-        </div>
-      </Card>
+              {filialData.length === 0 && (
+                <div className="flex-1 flex flex-col items-center justify-center py-10 opacity-20">
+                  <Target className="w-8 h-8 mb-2" />
+                  <span className="text-[10px] font-bold uppercase">Sem metas</span>
+                </div>
+              )}
+            </Card>
+          );
+        })}
+      </div>
 
       {/* Birthday List (Bonus for Premium feel) */}
       <Card className="p-6 bg-[#0F1629]/50 border-cyan-500/10">
