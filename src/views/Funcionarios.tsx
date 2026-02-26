@@ -22,6 +22,11 @@ export const Funcionarios = ({ permissions }: { permissions: any }) => {
     const [filterDepartamento, setFilterDepartamento] = useState('');
     const [filterCargo, setFilterCargo] = useState('');
     const [activeTab, setActiveTab] = useState<'geral' | 'ocorrencias'>('geral');
+    const [newOcorrencia, setNewOcorrencia] = useState({
+        tipo: 'Feedback',
+        data_ocorrencia: new Date().toLocaleDateString('en-CA'),
+        descricao: ''
+    });
 
     const [formData, setFormData] = useState({
         nome: '',
@@ -44,7 +49,6 @@ export const Funcionarios = ({ permissions }: { permissions: any }) => {
         contato_emergencia_telefone: '',
         plano_saude: false,
         ativo: true,
-        ocorrencias: '',
         ferias_inicio: '',
         ferias_fim: '',
     });
@@ -78,7 +82,7 @@ export const Funcionarios = ({ permissions }: { permissions: any }) => {
             const [funcionariosRes, filiaisRes, deptsRes, cargosRes] = await Promise.all([
                 supabase
                     .from('funcionarios')
-                    .select('*, filial:filiais(*), departamento:departamentos(*), cargo_rel:cargos(*)')
+                    .select('*, filial:filiais(*), departamento:departamentos(*), cargo_rel:cargos(*), ocorrencias_rel:ocorrencias_funcionario(*)')
                     .order('created_at', { ascending: false }),
                 supabase
                     .from('filiais')
@@ -130,7 +134,7 @@ export const Funcionarios = ({ permissions }: { permissions: any }) => {
         });
 
         // Other optional strings
-        const optionalStrings = ['email', 'data_desvinculamento', 'sexo', 'documento', 'cpf', 'pix', 'data_nascimento', 'celular', 'contato_emergencia_nome', 'contato_emergencia_parentesco', 'contato_emergencia_telefone', 'ocorrencias', 'ferias_inicio', 'ferias_fim'] as const;
+        const optionalStrings = ['email', 'data_desvinculamento', 'sexo', 'documento', 'cpf', 'pix', 'data_nascimento', 'celular', 'contato_emergencia_nome', 'contato_emergencia_parentesco', 'contato_emergencia_telefone', 'ferias_inicio', 'ferias_fim'] as const;
         optionalStrings.forEach(field => {
             if (!payload[field]) {
                 payload[field] = null;
@@ -138,6 +142,65 @@ export const Funcionarios = ({ permissions }: { permissions: any }) => {
         });
 
         return payload;
+    };
+
+    const handleAddOcorrencia = async () => {
+        if (!editingFuncionario) return;
+        try {
+            const { error } = await supabase
+                .from('ocorrencias_funcionario')
+                .insert([{
+                    funcionario_id: editingFuncionario.id,
+                    ...newOcorrencia
+                }]);
+            if (error) throw error;
+            setNewOcorrencia({
+                tipo: 'Feedback',
+                data_ocorrencia: new Date().toLocaleDateString('en-CA'),
+                descricao: ''
+            });
+            await fetchData();
+            // Refetch or update local state for editingFuncionario to show the new occurrence
+            const updated = await supabase
+                .from('funcionarios')
+                .select('*, filial:filiais(*), departamento:departamentos(*), cargo_rel:cargos(*), ocorrencias_rel:ocorrencias_funcionario(*)')
+                .eq('id', editingFuncionario.id)
+                .single();
+            if (updated.data) setEditingFuncionario(updated.data);
+            showToast('Ocorrência adicionada com sucesso!', 'success');
+        } catch (error) {
+            console.error('Error adding ocorrencia:', error);
+            showToast('Erro ao adicionar ocorrência.', 'error');
+        }
+    };
+
+    const handleDeleteOcorrencia = async (id: string) => {
+        const confirmed = await confirmAction({
+            title: 'Excluir Ocorrência',
+            message: 'Tem certeza que deseja excluir esta ocorrência?',
+            variant: 'danger'
+        });
+        if (!confirmed) return;
+        try {
+            const { error } = await supabase
+                .from('ocorrencias_funcionario')
+                .delete()
+                .eq('id', id);
+            if (error) throw error;
+            await fetchData();
+            // Update local state for editingFuncionario
+            if (editingFuncionario) {
+                const updated = await supabase
+                    .from('funcionarios')
+                    .select('*, filial:filiais(*), departamento:departamentos(*), cargo_rel:cargos(*), ocorrencias_rel:ocorrencias_funcionario(*)')
+                    .eq('id', editingFuncionario.id)
+                    .single();
+                if (updated.data) setEditingFuncionario(updated.data);
+            }
+            showToast('Ocorrência excluída.', 'success');
+        } catch (error) {
+            console.error('Error deleting ocorrencia:', error);
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -207,7 +270,6 @@ export const Funcionarios = ({ permissions }: { permissions: any }) => {
             contato_emergencia_telefone: f.contato_emergencia_telefone || '',
             plano_saude: f.plano_saude || false,
             ativo: f.ativo,
-            ocorrencias: f.ocorrencias || '',
             ferias_inicio: f.ferias_inicio || '',
             ferias_fim: f.ferias_fim || '',
         });
@@ -239,7 +301,6 @@ export const Funcionarios = ({ permissions }: { permissions: any }) => {
             contato_emergencia_telefone: '',
             plano_saude: false,
             ativo: true,
-            ocorrencias: '',
             ferias_inicio: '',
             ferias_fim: '',
         });
@@ -717,15 +778,101 @@ export const Funcionarios = ({ permissions }: { permissions: any }) => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
+                                <h4 className="text-cyan-400 font-semibold mb-4 flex items-center gap-2">
                                     <FileText className="w-4 h-4" /> Histórico de Ocorrências
-                                </label>
-                                <textarea
-                                    value={formData.ocorrencias}
-                                    onChange={(e) => setFormData({ ...formData, ocorrencias: e.target.value })}
-                                    placeholder="Advertências, suspensões, elogios, etc..."
-                                    className="w-full px-4 py-2 bg-[#151B2D] border border-gray-700 rounded-lg text-gray-200 focus:ring-2 focus:ring-cyan-500 h-40 resize-none"
-                                />
+                                </h4>
+
+                                {editingFuncionario ? (
+                                    <div className="space-y-6">
+                                        <div className="bg-[#0F1629]/50 border border-cyan-500/10 rounded-xl p-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Tipo</label>
+                                                    <select
+                                                        value={newOcorrencia.tipo}
+                                                        onChange={(e) => setNewOcorrencia({ ...newOcorrencia, tipo: e.target.value })}
+                                                        className="w-full px-3 py-2 bg-[#151B2D] border border-gray-700 rounded-lg text-gray-200 text-sm focus:ring-1 focus:ring-cyan-500"
+                                                    >
+                                                        <option value="Feedback">Feedback</option>
+                                                        <option value="Advertência">Advertência</option>
+                                                        <option value="Suspensão">Suspensão</option>
+                                                        <option value="Atestado">Atestado</option>
+                                                        <option value="Outro">Outro</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Data</label>
+                                                    <input
+                                                        type="date"
+                                                        value={newOcorrencia.data_ocorrencia}
+                                                        onChange={(e) => setNewOcorrencia({ ...newOcorrencia, data_ocorrencia: e.target.value })}
+                                                        className="w-full px-3 py-2 bg-[#151B2D] border border-gray-700 rounded-lg text-gray-200 text-sm focus:ring-1 focus:ring-cyan-500"
+                                                    />
+                                                </div>
+                                                <div className="flex items-end">
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleAddOcorrencia}
+                                                        disabled={!newOcorrencia.descricao}
+                                                        className="w-full py-2 bg-cyan-500 hover:bg-cyan-400 disabled:bg-gray-700 text-white text-sm font-bold rounded-lg transition-all shadow-lg shadow-cyan-500/20"
+                                                    >
+                                                        Registrar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Descrição</label>
+                                                <textarea
+                                                    value={newOcorrencia.descricao}
+                                                    onChange={(e) => setNewOcorrencia({ ...newOcorrencia, descricao: e.target.value })}
+                                                    placeholder="Descreva detalhes da ocorrência..."
+                                                    className="w-full px-3 py-2 bg-[#151B2D] border border-gray-700 rounded-lg text-gray-200 text-sm focus:ring-1 focus:ring-cyan-500 h-20 resize-none"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            {editingFuncionario.ocorrencias_rel && editingFuncionario.ocorrencias_rel.length > 0 ? (
+                                                editingFuncionario.ocorrencias_rel
+                                                    .sort((a, b) => new Date(b.data_ocorrencia).getTime() - new Date(a.data_ocorrencia).getTime())
+                                                    .map((occ) => (
+                                                        <div key={occ.id} className="p-3 bg-gray-800/30 border border-gray-700 rounded-lg flex justify-between items-start group">
+                                                            <div className="flex-1">
+                                                                <div className="flex items-center gap-2 mb-1">
+                                                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${occ.tipo === 'Atestado' ? 'bg-blue-500/10 text-blue-400' :
+                                                                        occ.tipo === 'Advertência' || occ.tipo === 'Suspensão' ? 'bg-red-500/10 text-red-400' :
+                                                                            'bg-cyan-500/10 text-cyan-400'
+                                                                        }`}>
+                                                                        {occ.tipo}
+                                                                    </span>
+                                                                    <span className="text-[10px] text-gray-500 font-medium">
+                                                                        {occ.data_ocorrencia.split('-').reverse().join('/')}
+                                                                    </span>
+                                                                </div>
+                                                                <p className="text-gray-300 text-xs leading-relaxed">{occ.descricao}</p>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleDeleteOcorrencia(occ.id)}
+                                                                className="p-1 opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all"
+                                                                title="Excluir Ocorrência"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    ))
+                                            ) : (
+                                                <div className="text-center py-6 bg-gray-800/20 rounded-lg border border-dashed border-gray-700">
+                                                    <p className="text-gray-500 text-sm italic">Nenhuma ocorrência registrada até o momento.</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="p-4 bg-cyan-500/5 rounded-lg border border-cyan-500/10">
+                                        <p className="text-cyan-400/80 text-sm">O histórico de ocorrências poderá ser preenchido após o cadastro inicial do funcionário.</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

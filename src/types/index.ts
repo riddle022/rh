@@ -61,6 +61,16 @@ export interface Venda {
   vendedor?: Vendedor;
 }
 
+export interface OcorrenciaFuncionario {
+  id: string;
+  funcionario_id: string;
+  tipo: string;
+  data_ocorrencia: string;
+  descricao: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Grupo {
   id: string;
   nome: string;
@@ -93,7 +103,7 @@ export interface Funcionario {
   contato_emergencia_telefone: string | null;
   plano_saude: boolean;
   horas_extras_registro: string | null;
-  ocorrencias: string | null;
+  ocorrencias_rel?: OcorrenciaFuncionario[];
   ferias_inicio: string | null;
   ferias_fim: string | null;
   ativo: boolean;
