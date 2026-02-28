@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Users,
   Award,
@@ -9,7 +9,10 @@ import {
   PieChart,
   BarChart3,
   Target,
-  TrendingUp
+  TrendingUp,
+  Settings,
+  AlertTriangle,
+  Umbrella
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Card } from '../components/ui/Card';
@@ -36,6 +39,10 @@ export const Dashboard = ({ permissions: _permissions }: { permissions: any }) =
     aniversariantesMes: 0,
   });
 
+  const [vacationThreshold, setVacationThreshold] = useState<number>(3);
+  const [showVacationSettings, setShowVacationSettings] = useState(false);
+
+
   useEffect(() => {
     fetchInitialData();
   }, []);
@@ -47,11 +54,12 @@ export const Dashboard = ({ permissions: _permissions }: { permissions: any }) =
       const currentYear = today.getFullYear();
       const currentDay = today.getDate();
 
-      const [filiaisRes, setoresRes, funcionariosRes, escalasRes] = await Promise.all([
+      const [filiaisRes, setoresRes, funcionariosRes, escalasRes, configRes] = await Promise.all([
         supabase.from('filiais').select('*').order('nome'),
         supabase.from('setores').select('*').order('nome'),
         supabase.from('funcionarios').select('*, filial:filiais(*), setor:setores(*)').eq('ativo', true),
-        supabase.from('escalas').select('id').eq('mes', currentMonth).eq('ano', currentYear)
+        supabase.from('escalas').select('id').eq('mes', currentMonth).eq('ano', currentYear),
+        supabase.from('configuracoes').select('*').eq('chave', 'vacation_alert_threshold').single()
       ]);
 
       const scaleIds = (escalasRes.data || []).map(s => s.id);
@@ -70,6 +78,10 @@ export const Dashboard = ({ permissions: _permissions }: { permissions: any }) =
       setSetores(setoresRes.data || []);
       setFuncionarios(funcionariosRes.data || []);
       setEscalaEntries(entries);
+
+      if (configRes.data) {
+        setVacationThreshold(Number(configRes.data.valor));
+      }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -100,6 +112,82 @@ export const Dashboard = ({ permissions: _permissions }: { permissions: any }) =
   const filteredFuncionarios = selectedFilial === 'all'
     ? funcionarios
     : funcionarios.filter(f => f.filial_id === selectedFilial);
+
+  const vacationAlerts = useMemo(() => {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+
+    return filteredFuncionarios.map(f => {
+      if (!f.data_admissao) return null;
+      const admissionDate = new Date(f.data_admissao);
+
+      // Total months of service
+      let diffMonths = (today.getFullYear() - admissionDate.getFullYear()) * 12 + (today.getMonth() - admissionDate.getMonth());
+      if (today.getDate() < admissionDate.getDate()) diffMonths--;
+
+      // If they took vacation this year, we consider it "settled" for the current alert purpose
+      const hasVacationThisYear = f.ferias_inicio && new Date(f.ferias_inicio).getFullYear() === currentYear;
+      if (hasVacationThisYear) return null;
+
+      /**
+       * PROFESSIONAL LOGIC (CONCESSIVE PERIOD FOCUS):
+       * 1. Legal Risk (Alerta Vermelha): Controlled by the Settings Wheel.
+       *    Formula: 24 months - vacationThreshold.
+       * 
+       * 2. Concessive Period (Alerta Laranja): Starts right after 12 months.
+       */
+
+      // NIVEL 1: Risco Legal (Multa/Dobro) - Baseado na Ruedita
+      // Prazo legal de 24 meses - meses de antecedência definidos pelo usuário
+      const legalRiskThreshold = 24 - vacationThreshold;
+
+      if (diffMonths >= legalRiskThreshold) {
+        return {
+          ...f,
+          alertType: 'legal_risk',
+          message: 'Risco Legal: Férias em Dobro Próximas',
+          color: 'text-red-400',
+          bg: 'bg-red-500/10',
+          border: 'border-red-500/20',
+          iconColor: 'text-red-400',
+          months: diffMonths
+        };
+      }
+
+      // NIVEL 2: Período Concessivo (Já completou 12 meses)
+      if (diffMonths >= 12) {
+        return {
+          ...f,
+          alertType: 'concessive_period',
+          message: 'Período Concessivo Ligado',
+          color: 'text-orange-400',
+          bg: 'bg-orange-500/10',
+          border: 'border-orange-500/20',
+          iconColor: 'text-orange-400',
+          months: diffMonths
+        };
+      }
+
+
+
+      return null;
+    }).filter(Boolean) as (Funcionario & { alertType: string, message: string, color: string, bg: string, border: string, iconColor: string, months: number })[];
+  }, [filteredFuncionarios, vacationThreshold]);
+
+  const handleSaveThreshold = async (val: number) => {
+    try {
+      setVacationThreshold(val);
+      const { error } = await supabase
+        .from('configuracoes')
+        .upsert({ chave: 'vacation_alert_threshold', valor: JSON.stringify(val) }, { onConflict: 'chave' });
+
+      if (error) throw error;
+      setShowVacationSettings(false);
+    } catch (error) {
+      console.error('Error saving vacation threshold:', error);
+      alert('Erro ao salvar configuração');
+    }
+  };
 
   useEffect(() => {
     const today = new Date();
@@ -430,41 +518,127 @@ export const Dashboard = ({ permissions: _permissions }: { permissions: any }) =
         })}
       </div>
 
-      {/* Birthday List (Bonus for Premium feel) */}
-      <Card className="p-6 bg-[#0F1629]/50 border-cyan-500/10">
-        <h2 className="text-xl font-bold text-gray-200 mb-4 flex items-center gap-2">
-          <Award className="w-5 h-5 text-yellow-400" />
-          Destaques & Aniversariantes
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredFuncionarios.filter(f => {
-            if (!f.data_nascimento) return false;
-            const birthDay = new Date(f.data_nascimento).getMonth();
-            return birthDay === new Date().getMonth();
-          }).slice(0, 3).map((f, i) => (
-            <div key={i} className="flex items-center gap-3 p-3 bg-cyan-500/5 rounded-xl border border-cyan-500/10">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-cyan-600 flex items-center justify-center text-white font-bold">
-                {f.nome.charAt(0)}
-              </div>
-              <div>
-                <p className="text-sm font-bold text-gray-200">{f.nome}</p>
-                <p className="text-[10px] text-cyan-400 font-bold uppercase">{f.setor?.nome}</p>
-              </div>
-              <div className="ml-auto flex flex-col items-end gap-1">
-                <div className="w-8 h-8 rounded-lg bg-yellow-400/20 flex items-center justify-center">
-                  <Calendar className="w-4 h-4 text-yellow-400" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Vacation Alerts */}
+        <Card className="p-6 bg-[#0F1629]/50 border-cyan-500/10">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-gray-200 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-orange-400" />
+              Alerta de Férias
+            </h2>
+            <div className="relative">
+              <button
+                onClick={() => setShowVacationSettings(!showVacationSettings)}
+                className="p-2 hover:bg-white/5 rounded-lg transition-colors text-gray-400 hover:text-cyan-400"
+              >
+                <Settings className="w-5 h-5" />
+              </button>
+
+              {showVacationSettings && (
+                <div className="absolute right-0 mt-2 w-64 bg-[#1A2235] border border-cyan-500/30 p-4 rounded-xl shadow-2xl z-50 backdrop-blur-xl">
+                  <p className="text-xs font-bold text-gray-400 uppercase mb-3">Risco Legal (Férias em Dobro)</p>
+                  <label className="text-xs text-gray-200 block mb-2">
+                    Meses de antecedência: <strong>{vacationThreshold} meses</strong>
+                  </label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="12"
+                    value={vacationThreshold}
+                    onChange={(e) => setVacationThreshold(parseInt(e.target.value))}
+                    className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-400 mb-4"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => setShowVacationSettings(false)}
+                      className="px-3 py-1 text-xs font-bold text-gray-400 hover:text-gray-200"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={() => handleSaveThreshold(vacationThreshold)}
+                      className="px-3 py-1 text-xs font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/50 rounded-lg hover:bg-cyan-500/30"
+                    >
+                      Salvar
+                    </button>
+                  </div>
                 </div>
-                <span className="text-[10px] font-bold text-yellow-500/80 bg-yellow-500/5 px-1.5 py-0.5 rounded border border-yellow-500/10 whitespace-nowrap">
-                  {f.data_nascimento ? new Date(f.data_nascimento + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : ''}
-                </span>
-              </div>
+              )}
             </div>
-          ))}
-          {stats.aniversariantesMes === 0 && (
-            <p className="text-gray-500 text-sm italic col-span-3 text-center py-4">Nenhum aniversariante encontrado neste mês.</p>
-          )}
-        </div>
-      </Card>
+          </div>
+
+          <div className="space-y-3">
+            {vacationAlerts.length > 0 ? (
+              vacationAlerts.map((f, i) => {
+                return (
+                  <div key={i} className={`flex items-center gap-3 p-3 ${f.bg} rounded-xl border ${f.border}`}>
+                    <div className={`w-10 h-10 rounded-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center text-white font-bold`}>
+                      {f.nome.charAt(0)}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-gray-200">{f.nome}</p>
+                      <p className={`text-[10px] ${f.color} font-bold uppercase`}>
+                        {f.message}
+                      </p>
+                      <p className="text-[10px] text-gray-500 font-medium italic">
+                        Admitido em: {new Date(f.data_admissao + 'T12:00:00').toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <div className={`w-8 h-8 rounded-lg ${f.bg} flex items-center justify-center ml-auto mb-1`}>
+                        <Umbrella className={`w-4 h-4 ${f.iconColor}`} />
+                      </div>
+                      <span className="text-[10px] font-bold text-gray-500 uppercase">{f.months} meses</span>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center py-8 text-gray-500 italic text-sm">
+                Nenhum alerta de férias no momento.
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* Aniversariantes (Moved into grid) */}
+        <Card className="p-6 bg-[#0F1629]/50 border-cyan-500/10">
+          <h2 className="text-xl font-bold text-gray-200 mb-6 flex items-center gap-2">
+            <Award className="w-5 h-5 text-yellow-400" />
+            Aniversariantes do Mês
+          </h2>
+          <div className="space-y-3">
+            {filteredFuncionarios.filter(f => {
+              if (!f.data_nascimento) return false;
+              const birthDay = new Date(f.data_nascimento).getMonth();
+              return birthDay === new Date().getMonth();
+            }).slice(0, 5).map((f, i) => (
+              <div key={i} className="flex items-center gap-3 p-3 bg-cyan-500/5 rounded-xl border border-cyan-500/10">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-cyan-600 flex items-center justify-center text-white font-bold">
+                  {f.nome.charAt(0)}
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-gray-200">{f.nome}</p>
+                  <p className="text-[10px] text-cyan-400 font-bold uppercase">{f.setor?.nome || 'RH'}</p>
+                </div>
+                <div className="text-right">
+                  <div className="w-8 h-8 rounded-lg bg-yellow-400/20 flex items-center justify-center ml-auto mb-1">
+                    <Calendar className="w-4 h-4 text-yellow-400" />
+                  </div>
+                  <span className="text-[10px] font-bold text-yellow-500/80">
+                    {f.data_nascimento ? new Date(f.data_nascimento + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : ''}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {stats.aniversariantesMes === 0 && (
+              <div className="text-center py-8 text-gray-500 italic text-sm">
+                Nenhum aniversariante encontrado neste mês.
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
     </div>
   );
 };

@@ -262,3 +262,10 @@ export interface FilialMetaMensal {
   created_at: string;
   updated_at: string;
 }
+
+export interface Configuracao {
+  id: string;
+  chave: string;
+  valor: any;
+  updated_at: string;
+}
