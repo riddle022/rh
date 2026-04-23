@@ -45,7 +45,9 @@ export const ValeMercadoria = ({ permissions }: { permissions: any }) => {
     const [vales, setVales] = useState<ValeMercadoriaData[]>([]);
     const [totalValue, setTotalValue] = useState<number>(0);
     const [installmentsCount, setInstallmentsCount] = useState<number>(1);
+    const [numeroNf, setNumeroNf] = useState('');
     const [installments, setInstallments] = useState<Installment[]>([]);
+    const [editingValeId, setEditingValeId] = useState<string | null>(null);
     const [editingParcelaId, setEditingParcelaId] = useState<string | null>(null);
     const [editParcelaData, setEditParcelaData] = useState<{ valor: number; data_vencimento: string }>({
         valor: 0,
@@ -132,8 +134,17 @@ export const ValeMercadoria = ({ permissions }: { permissions: any }) => {
     }, [vales, listSearchTerm, filterFilial, filterStatus, filterData, filterTotal, selectedMonth, selectedYear]);
 
     const filteredTotal = useMemo(() => {
-        return filteredVales.reduce((acc: number, v: ValeMercadoriaData) => acc + v.valor_total, 0);
-    }, [filteredVales]);
+        return filteredVales.reduce((acc: number, v: ValeMercadoriaData) => {
+            if (selectedMonth !== 'all') {
+                const p = v.parcelas?.find(p => {
+                    const d = new Date(p.data_vencimento);
+                    return (d.getMonth() + 1) === selectedMonth && d.getFullYear() === selectedYear;
+                });
+                return acc + (p?.valor || 0);
+            }
+            return acc + v.valor_total;
+        }, 0);
+    }, [filteredVales, selectedMonth, selectedYear]);
 
     // Automated Calculation Logic
     useEffect(() => {
@@ -177,36 +188,78 @@ export const ValeMercadoria = ({ permissions }: { permissions: any }) => {
         try {
             setLoading(true);
 
-            // 1. Create the Vale
-            const { data: vale, error: valeError } = await supabase
-                .from('vales_mercadoria')
-                .insert([{
-                    funcionario_id: selectedFuncionarioId,
-                    valor_total: totalValue,
-                    parcelas_total: installmentsCount,
-                    status: 'ativo'
-                }])
-                .select()
-                .single();
+            if (editingValeId) {
+                // UPDATE MODE
+                // 1. Update the Vale
+                const { error: valeError } = await supabase
+                    .from('vales_mercadoria')
+                    .update({
+                        funcionario_id: selectedFuncionarioId,
+                        valor_total: totalValue,
+                        parcelas_total: installmentsCount,
+                        numero_nf: numeroNf || null,
+                    })
+                    .eq('id', editingValeId);
 
-            if (valeError) throw valeError;
+                if (valeError) throw valeError;
 
-            // 2. Create the Installments
-            const installmentsToInsert = installments.map(inst => ({
-                vale_id: vale.id,
-                num_parcela: inst.parcela,
-                valor: inst.valor,
-                data_vencimento: inst.vencimento,
-                pago: false
-            }));
+                // 2. Remove old installments and insert new ones
+                const { error: deleteError } = await supabase
+                    .from('vales_mercadoria_parcelas')
+                    .delete()
+                    .eq('vale_id', editingValeId);
 
-            const { error: instError } = await supabase
-                .from('vales_mercadoria_parcelas')
-                .insert(installmentsToInsert);
+                if (deleteError) throw deleteError;
 
-            if (instError) throw instError;
+                const installmentsToInsert = installments.map(inst => ({
+                    vale_id: editingValeId,
+                    num_parcela: inst.parcela,
+                    valor: inst.valor,
+                    data_vencimento: inst.vencimento,
+                    pago: false
+                }));
 
-            showToast('Vale mercadoria registrado com sucesso!', 'success');
+                const { error: instError } = await supabase
+                    .from('vales_mercadoria_parcelas')
+                    .insert(installmentsToInsert);
+
+                if (instError) throw instError;
+
+                showToast('Vale mercadoria atualizado com sucesso!', 'success');
+            } else {
+                // INSERT MODE
+                // 1. Create the Vale
+                const { data: vale, error: valeError } = await supabase
+                    .from('vales_mercadoria')
+                    .insert([{
+                        funcionario_id: selectedFuncionarioId,
+                        valor_total: totalValue,
+                        parcelas_total: installmentsCount,
+                        numero_nf: numeroNf || null,
+                        status: 'ativo'
+                    }])
+                    .select()
+                    .single();
+
+                if (valeError) throw valeError;
+
+                // 2. Create the Installments
+                const installmentsToInsert = installments.map(inst => ({
+                    vale_id: vale.id,
+                    num_parcela: inst.parcela,
+                    valor: inst.valor,
+                    data_vencimento: inst.vencimento,
+                    pago: false
+                }));
+
+                const { error: instError } = await supabase
+                    .from('vales_mercadoria_parcelas')
+                    .insert(installmentsToInsert);
+
+                if (instError) throw instError;
+
+                showToast('Vale mercadoria registrado com sucesso!', 'success');
+            }
             setIsModalOpen(false);
             resetForm();
             fetchData();
@@ -360,10 +413,22 @@ export const ValeMercadoria = ({ permissions }: { permissions: any }) => {
         }
     };
 
+    const handleEditVale = (vale: ValeMercadoriaData) => {
+        setEditingValeId(vale.id);
+        setSelectedFuncionarioId(vale.funcionario_id);
+        setSearchTerm(vale.funcionario?.nome || '');
+        setTotalValue(vale.valor_total);
+        setInstallmentsCount(vale.parcelas_total);
+        setNumeroNf(vale.numero_nf || '');
+        setIsModalOpen(true);
+    };
+
     const resetForm = () => {
+        setEditingValeId(null);
         setSelectedFuncionarioId('');
         setTotalValue(0);
         setInstallmentsCount(1);
+        setNumeroNf('');
         setInstallments([]);
         setSearchTerm('');
     };
@@ -584,7 +649,7 @@ export const ValeMercadoria = ({ permissions }: { permissions: any }) => {
                                 </th>
                                 <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider relative">
                                     <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setOpenFilter(openFilter === 'total' ? null : 'total')}>
-                                        Total
+                                        {selectedMonth !== 'all' ? 'Vlr. Parcela' : 'Total'}
                                         <Filter className={`w-3 h-3 transition-colors ${(openFilter === 'total' || filterTotal !== '') ? 'text-yellow-400' : 'text-cyan-500/50 hover:text-cyan-400'}`} />
                                     </div>
                                     {openFilter === 'total' && (
@@ -640,17 +705,42 @@ export const ValeMercadoria = ({ permissions }: { permissions: any }) => {
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col">
                                                 <span className="text-gray-200 font-medium">{vale.funcionario?.nome}</span>
-                                                <span className="text-[10px] text-gray-500 uppercase">{vale.funcionario?.filial?.nome || vale.funcionario?.filial_id}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] text-gray-500 uppercase">{vale.funcionario?.filial?.nome || vale.funcionario?.filial_id}</span>
+                                                    {vale.numero_nf && (
+                                                        <span className="text-[10px] text-cyan-500 font-bold">
+                                                            • NF: {vale.numero_nf}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-gray-400 text-sm">
                                             {new Date(vale.created_at).toLocaleDateString('pt-BR')}
                                         </td>
                                         <td className="px-6 py-4 text-gray-300 font-bold">
-                                            R$ {vale.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                            {selectedMonth !== 'all' ? (
+                                                <span className="text-cyan-400">
+                                                    R$ {vale.parcelas?.find(p => {
+                                                        const d = new Date(p.data_vencimento);
+                                                        return (d.getMonth() + 1) === selectedMonth && d.getFullYear() === selectedYear;
+                                                    })?.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                                                </span>
+                                            ) : (
+                                                `R$ ${vale.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 text-gray-400">
-                                            {vale.parcelas_total}x
+                                            {selectedMonth !== 'all' ? (
+                                                <span className="text-gray-200 font-medium">
+                                                    {vale.parcelas?.find(p => {
+                                                        const d = new Date(p.data_vencimento);
+                                                        return (d.getMonth() + 1) === selectedMonth && d.getFullYear() === selectedYear;
+                                                    })?.num_parcela}/{vale.parcelas_total}
+                                                </span>
+                                            ) : (
+                                                `${vale.parcelas_total}x`
+                                            )}
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${vale.status === 'ativo' ? 'bg-cyan-500/20 text-cyan-400' :
@@ -661,15 +751,24 @@ export const ValeMercadoria = ({ permissions }: { permissions: any }) => {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <button
-                                                onClick={() => {
-                                                    setSelectedVale(vale);
-                                                    setIsDetailModalOpen(true);
-                                                }}
-                                                className="text-gray-500 hover:text-cyan-400 transition-colors"
-                                            >
-                                                <ChevronRight className="w-4 h-4" />
-                                            </button>
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    onClick={() => handleEditVale(vale)}
+                                                    className="text-gray-500 hover:text-cyan-400 transition-colors"
+                                                    title="Editar Vale"
+                                                >
+                                                    <Edit2 className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedVale(vale);
+                                                        setIsDetailModalOpen(true);
+                                                    }}
+                                                    className="text-gray-500 hover:text-cyan-400 transition-colors"
+                                                >
+                                                    <ChevronRight className="w-4 h-4" />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
@@ -701,7 +800,7 @@ export const ValeMercadoria = ({ permissions }: { permissions: any }) => {
             <Modal
                 isOpen={isModalOpen}
                 onClose={() => { setIsModalOpen(false); resetForm(); }}
-                title="Nova Concessão de Vale"
+                title={editingValeId ? "Editar Concessão de Vale" : "Nova Concessão de Vale"}
             >
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -770,6 +869,20 @@ export const ValeMercadoria = ({ permissions }: { permissions: any }) => {
                                     onChange={(e) => setInstallmentsCount(Number(e.target.value))}
                                     className="w-full pl-10 pr-4 py-3 bg-[#151B2D] border border-gray-700 rounded-xl text-gray-200 focus:ring-2 focus:ring-cyan-500 transition-all font-bold"
                                     required
+                                />
+                            </div>
+                        </div>
+
+                        <div className="mt-2 md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-400 mb-2">Número da Nota Fiscal (NF) - Opcional</label>
+                            <div className="relative">
+                                <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                                <input
+                                    type="text"
+                                    value={numeroNf}
+                                    onChange={(e) => setNumeroNf(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-3 bg-[#151B2D] border border-gray-700 rounded-xl text-gray-200 focus:ring-2 focus:ring-cyan-500 transition-all font-medium"
+                                    placeholder="Ex: 123456"
                                 />
                             </div>
                         </div>
@@ -848,10 +961,14 @@ export const ValeMercadoria = ({ permissions }: { permissions: any }) => {
                 title={`Detalhes do Vale - ${selectedVale?.funcionario?.nome}`}
             >
                 <div className="space-y-6">
-                    <div className="grid grid-cols-2 gap-4 bg-[#151B2D] p-4 rounded-xl border border-cyan-500/10">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-[#151B2D] p-4 rounded-xl border border-cyan-500/10">
                         <div>
                             <p className="text-xs text-gray-500 uppercase font-bold">Total do Vale</p>
                             <p className="text-xl font-bold text-cyan-400">R$ {selectedVale?.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-gray-500 uppercase font-bold">Nota Fiscal (NF)</p>
+                            <p className="text-xl font-bold text-gray-200">{selectedVale?.numero_nf || 'Não informada'}</p>
                         </div>
                         <div>
                             <p className="text-xs text-gray-500 uppercase font-bold">Status Atual</p>

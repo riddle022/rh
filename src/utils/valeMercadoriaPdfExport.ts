@@ -111,7 +111,9 @@ export const exportValeMercadoriaToPdf = ({
     const headerRow = [];
     if (showFunc) headerRow.push('Funcionário');
     if (showFilial) headerRow.push('Filial');
-    headerRow.push('Data', 'Total');
+    headerRow.push('NF');
+    headerRow.push('Data');
+    headerRow.push(periodo.mes !== 'all' ? 'Vlr. Parcela' : 'Total');
     headerRow.push('Parcelas');
     if (showStatus) headerRow.push('Status');
     tableHeaders.push(headerRow);
@@ -120,14 +122,33 @@ export const exportValeMercadoriaToPdf = ({
         const row = [];
         if (showFunc) row.push(v.funcionario?.nome || 'N/A');
         if (showFilial) row.push(v.funcionario?.filial?.nome || 'N/A');
+        row.push(v.numero_nf || '-');
         row.push(new Date(v.created_at).toLocaleDateString('pt-BR'));
-        row.push(v.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 }));
-        row.push(`${v.parcelas_total}x`);
+        
+        if (periodo.mes !== 'all') {
+            const p = v.parcelas?.find(p => {
+                const d = new Date(p.data_vencimento);
+                return (d.getMonth() + 1) === periodo.mes && d.getFullYear() === periodo.ano;
+            });
+            row.push(p?.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00');
+        } else {
+            row.push(v.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 }));
+        }
+        
+        if (periodo.mes !== 'all') {
+            const p = v.parcelas?.find(p => {
+                const d = new Date(p.data_vencimento);
+                return (d.getMonth() + 1) === periodo.mes && d.getFullYear() === periodo.ano;
+            });
+            row.push(`${p?.num_parcela || '?'}/${v.parcelas_total}`);
+        } else {
+            row.push(`${v.parcelas_total}x`);
+        }
         if (showStatus) row.push(v.status);
         return row;
     });
 
-    const valorColIndex = headerRow.indexOf('Total');
+    const valorColIndex = headerRow.indexOf(periodo.mes !== 'all' ? 'Vlr. Parcela' : 'Total');
     const tableFoot = [headerRow.map((_, index) => {
         if (index === valorColIndex) return formatCurrency(totalGeral);
         if (index === valorColIndex - 1) return 'TOTAL:';

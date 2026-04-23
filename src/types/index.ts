@@ -138,6 +138,7 @@ export interface ValeMercadoriaData {
   valor_total: number;
   parcelas_total: number;
   status: 'ativo' | 'quitado' | 'cancelado';
+  numero_nf: string | null;
   observacoes: string | null;
   created_at: string;
   updated_at: string;
