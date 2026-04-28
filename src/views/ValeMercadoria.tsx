@@ -13,7 +13,8 @@ import {
     X as CloseIcon,
     Calendar as CalendarIcon,
     Filter,
-    FileText
+    FileText,
+    ArrowUpDown
 } from 'lucide-react';
 import { useRef } from 'react';
 import { supabase } from '../lib/supabase';
@@ -64,6 +65,7 @@ export const ValeMercadoria = ({ permissions }: { permissions: any }) => {
     const [filterTotal, setFilterTotal] = useState<string>('');
     const [filiais, setFiliais] = useState<Filial[]>([]);
     const [openFilter, setOpenFilter] = useState<string | null>(null);
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | 'none'>('none');
     const filterRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -110,7 +112,7 @@ export const ValeMercadoria = ({ permissions }: { permissions: any }) => {
     }, []);
 
     const filteredVales = useMemo(() => {
-        return vales.filter(vale => {
+        const filtered = vales.filter(vale => {
             const matchesSearch = vale.funcionario?.nome.toLowerCase().includes(listSearchTerm.toLowerCase());
             const matchesFilial = filterFilial === 'all' || vale.funcionario?.filial?.nome === filterFilial;
             const matchesStatus = filterStatus === 'all' || vale.status === filterStatus;
@@ -131,7 +133,17 @@ export const ValeMercadoria = ({ permissions }: { permissions: any }) => {
 
             return matchesSearch && matchesFilial && matchesStatus && matchesData && matchesTotal && matchesMonthYear;
         });
-    }, [vales, listSearchTerm, filterFilial, filterStatus, filterData, filterTotal, selectedMonth, selectedYear]);
+
+        if (sortOrder === 'none') return filtered;
+
+        return [...filtered].sort((a, b) => {
+            const nameA = a.funcionario?.nome || '';
+            const nameB = b.funcionario?.nome || '';
+            return sortOrder === 'asc' 
+                ? nameA.localeCompare(nameB) 
+                : nameB.localeCompare(nameA);
+        });
+    }, [vales, listSearchTerm, filterFilial, filterStatus, filterData, filterTotal, selectedMonth, selectedYear, sortOrder]);
 
     const filteredTotal = useMemo(() => {
         return filteredVales.reduce((acc: number, v: ValeMercadoriaData) => {
@@ -595,9 +607,21 @@ export const ValeMercadoria = ({ permissions }: { permissions: any }) => {
                         <thead>
                             <tr className="text-left bg-cyan-500/5">
                                 <th className="px-6 py-4 text-xs font-bold text-cyan-400 uppercase tracking-wider relative">
-                                    <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setOpenFilter(openFilter === 'filial' ? null : 'filial')}>
-                                        Funcionário / Filial
-                                        <Filter className={`w-3 h-3 transition-colors ${(openFilter === 'filial' || filterFilial !== 'all') ? 'text-yellow-400' : 'text-cyan-500/50 hover:text-cyan-400'}`} />
+                                    <div className="flex items-center gap-2">
+                                        <div 
+                                            className="flex items-center gap-2 group cursor-pointer" 
+                                            onClick={() => setOpenFilter(openFilter === 'filial' ? null : 'filial')}
+                                        >
+                                            Funcionário / Filial
+                                            <Filter className={`w-3 h-3 transition-colors ${(openFilter === 'filial' || filterFilial !== 'all') ? 'text-yellow-400' : 'text-cyan-500/50 hover:text-cyan-400'}`} />
+                                        </div>
+                                        <button
+                                            onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                                            className={`p-1 rounded hover:bg-cyan-500/10 transition-all ${sortOrder !== 'none' ? 'text-yellow-400' : 'text-cyan-500/50 hover:text-cyan-400'}`}
+                                            title="Ordenar Alfabeticamente"
+                                        >
+                                            <ArrowUpDown className="w-3 h-3" />
+                                        </button>
                                     </div>
                                     {openFilter === 'filial' && (
                                         <div ref={filterRef} className="absolute z-[100] top-full left-0 mt-1 p-2 bg-[#151B2D] border border-cyan-500/20 rounded-lg shadow-2xl min-w-[150px]">
